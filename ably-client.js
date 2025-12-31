@@ -57,7 +57,7 @@ class AblyRestClient {
     }
   }
 
-  // Subscribe to channel events using SSE
+  // Subscribe to channel events using polling
   subscribe(channelName, eventName, callback) {
     const key = `${channelName}:${eventName}`;
     
@@ -67,69 +67,20 @@ class AblyRestClient {
     
     this.subscribers.get(key).push(callback);
 
-    // Start SSE connection if not already started
-    if (!this.eventSource) {
-      this.startSSEConnection(channelName);
-    }
-  }
-
-  // Start Server-Sent Events connection for real-time updates
-  startSSEConnection(channelName) {
-    const url = `${this.baseUrl}/channels/${encodeURIComponent(channelName)}/messages?clientId=${this.clientId}`;
-    
-    try {
-      // EventSource doesn't support custom headers, use key query param
-      const sseUrl = `${url}&key=${encodeURIComponent(this.apiKey)}`;
-      
-      this.eventSource = new EventSource(sseUrl);
-
-      this.eventSource.onopen = () => {
-        console.log('SSE Connected');
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.notifyConnectionListeners('connected');
-      };
-
-      this.eventSource.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          this.handleMessage(message);
-        } catch (error) {
-          console.error('Failed to parse message:', error);
-        }
-      };
-
-      this.eventSource.onerror = (error) => {
-        console.error('SSE Error:', error);
-        this.isConnected = false;
-        this.notifyConnectionListeners('disconnected');
-        
-        // Close and attempt reconnect
-        this.eventSource.close();
-        this.eventSource = null;
-        
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          setTimeout(() => {
-            console.log(`Reconnecting... Attempt ${this.reconnectAttempts}`);
-            this.startSSEConnection(channelName);
-          }, 2000 * this.reconnectAttempts);
-        }
-      };
-    } catch (error) {
-      console.error('Failed to start SSE:', error);
-      // Fallback to polling if SSE fails
+    // Start polling if not already started
+    if (!this.pollingInterval) {
       this.startPolling(channelName);
     }
   }
 
-  // Fallback: Polling method for receiving messages
+  // Polling method for receiving messages (more reliable than SSE with REST API)
   startPolling(channelName) {
-    let lastMessageId = null;
+    let lastMessageTime = Date.now();
     
     const poll = async () => {
       try {
-        let url = `${this.baseUrl}/channels/${encodeURIComponent(channelName)}/messages?limit=10`;
+        // Get recent messages
+        const url = `${this.baseUrl}/channels/${encodeURIComponent(channelName)}/messages?limit=10&direction=forwards&start=${lastMessageTime}`;
         
         const response = await fetch(url, {
           headers: {
@@ -141,12 +92,15 @@ class AblyRestClient {
           const messages = await response.json();
           
           // Process new messages
-          messages.forEach(message => {
-            if (!lastMessageId || message.id !== lastMessageId) {
+          if (messages && messages.length > 0) {
+            messages.forEach(message => {
               this.handleMessage(message);
-              lastMessageId = message.id;
-            }
-          });
+              // Update last message time
+              if (message.timestamp) {
+                lastMessageTime = message.timestamp + 1;
+              }
+            });
+          }
           
           if (!this.isConnected) {
             this.isConnected = true;
@@ -160,12 +114,19 @@ class AblyRestClient {
           this.notifyConnectionListeners('disconnected');
         }
       }
-
-      // Continue polling
-      setTimeout(poll, 1000);
     };
 
+    // Poll every 500ms for responsiveness
+    this.pollingInterval = setInterval(poll, 500);
+    
+    // Initial poll
     poll();
+    
+    // Mark as connected immediately
+    setTimeout(() => {
+      this.isConnected = true;
+      this.notifyConnectionListeners('connected');
+    }, 100);
   }
 
   // Handle incoming messages
@@ -199,9 +160,9 @@ class AblyRestClient {
 
   // Close connection
   close() {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
     }
     this.isConnected = false;
   }
