@@ -78,9 +78,8 @@ class AblyRestClient {
     const url = `${this.baseUrl}/channels/${encodeURIComponent(channelName)}/messages?clientId=${this.clientId}`;
     
     try {
-      // Create EventSource with auth header (using enveloped format)
-      const encodedAuth = btoa(this.apiKey);
-      const sseUrl = `${url}&authorization=${encodeURIComponent('Basic ' + encodedAuth)}`;
+      // EventSource doesn't support custom headers, use key query param
+      const sseUrl = `${url}&key=${encodeURIComponent(this.apiKey)}`;
       
       this.eventSource = new EventSource(sseUrl);
 
