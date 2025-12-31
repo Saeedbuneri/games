@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Badminton Game - Big Screen</title>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="ably-client.js"></script>
+  <script src="physics.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(180deg, #1e3a8a 0%, #3b82f6 100%);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    
+    .game-container {
+      position: relative;
+      width: 1200px;
+      height: 800px;
+      background: linear-gradient(180deg, #7dd3fc 0%, #4ade80 100%);
+      border: 10px solid #1e3a8a;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    .hud {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 40px;
+      z-index: 10;
+    }
+    
+    .score-panel {
+      background: rgba(255,255,255,0.95);
+      padding: 20px 40px;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      text-align: center;
+      min-width: 150px;
+    }
+    
+    .score-panel .player-name {
+      font-size: 1.2em;
+      font-weight: bold;
+      color: #1e3a8a;
+      margin-bottom: 10px;
+    }
+    
+    .score-panel .score {
+      font-size: 3em;
+      font-weight: bold;
+      color: #3b82f6;
+    }
+    
+    .waiting-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.95);
+      padding: 40px 60px;
+      border-radius: 20px;
+      text-align: center;
+      z-index: 100;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .waiting-message h2 {
+      color: #1e3a8a;
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+    
+    .waiting-message p {
+      color: #64748b;
+      font-size: 1.2em;
+    }
+    
+    .waiting-message.hidden {
+      display: none;
+    }
+    
+    .game-event {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 4em;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      z-index: 50;
+      animation: eventPop 1s ease-out;
+      pointer-events: none;
+    }
+    
+    @keyframes eventPop {
+      0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+      50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+    
+    .connection-status {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 0.9em;
+    }
+    
+    .connection-status.connected {
+      background: rgba(74, 222, 128, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <canvas id="gameCanvas" width="1200" height="800"></canvas>
+    
+    <div class="hud">
+      <div class="score-panel">
+        <div class="player-name">Player 1</div>
+        <div class="score" id="score1">0</div>
+      </div>
+      <div class="score-panel">
+        <div class="player-name">Player 2</div>
+        <div class="score" id="score2">0</div>
+      </div>
+    </div>
+    
+    <div class="waiting-message" id="waitingMessage">
+      <h2>🏸 Waiting for Players...</h2>
+      <p>Open the controller on your phones to join!</p>
+      <p style="margin-top: 10px; font-size: 0.9em;">Channel: <strong id="channelName"></strong></p>
+    </div>
+    
+    <div class="connection-status" id="connectionStatus">
+      Connecting...
+    </div>
+  </div>
+
+  <script>
+    class BadmintonGame {
+      constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.ably = null;
+        this.channel = null;
+        this.gameState = new GameState();
+        this.lastFrameTime = Date.now();
+        this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+        this.particles = [];
+        
+        this.init();
+      }
+      
+      async init() {
+        await this.connectToAbly();
+        this.setupEventListeners();
+        this.startGameLoop();
+        document.getElementById('channelName').textContent = CONFIG.GAME_CHANNEL;
+      }
+      
+      async connectToAbly() {
+        try {
+          this.ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
+          this.channel = this.ably.channels.get(CONFIG.GAME_CHANNEL);
+          
+          this.ably.connection.on('connected', () => {
+            this.updateConnectionStatus('Connected', true);
+          });
+          
+          this.ably.connection.on('disconnected', () => {
+            this.updateConnectionStatus('Disconnected', false);
+          });
+          
+          // Listen for player events
+          this.channel.subscribe('playerJoin', (message) => {
+            this.handlePlayerJoin(message.data);
+          });
+          
+          this.channel.subscribe('swing', (message) => {
+            this.handleSwing(message.data);
+          });
+          
+        } catch (error) {
+          console.error('Ably connection error:', error);
+          this.updateConnectionStatus('Connection Failed', false);
+        }
+      }
+      
+      setupEventListeners() {
+        // Handle window resize
+        window.addEventListener('resize', () => {
+          // Could adjust canvas size here if needed
+        });
+      }
+      
+      handlePlayerJoin(data) {
+        console.log('Player joined:', data.playerId);
+        this.gameState.addPlayer(data.playerId);
+        
+        // Send acknowledgment
+        this.channel.publish('playerAck', {
+          playerId: data.playerId,
+          position: this.gameState.players.get(data.playerId).position
+        });
+        
+        // Hide waiting message if game starts
+        if (this.gameState.gameActive) {
+          document.getElementById('waitingMessage').classList.add('hidden');
+        }
+      }
+      
+      handleSwing(data) {
+        console.log('Swing detected:', data);
+        
+        const result = this.gameState.processSwing(data.playerId, data);
+        
+        if (result.success) {
+          // Show visual effect
+          if (data.type === 'smash') {
+            this.triggerScreenShake(CONFIG.SMASH_SHAKE_INTENSITY, CONFIG.SMASH_SHAKE_DURATION);
+            this.showGameEvent('SMASH! 💥');
+          }
+          
+          // Create impact particles
+          const player = this.gameState.players.get(data.playerId);
+          if (player) {
+            this.createParticles(player.position.x, player.position.y, data.type === 'smash');
+          }
+          
+          // Send haptic feedback to phone
+          this.channel.publish('haptic', {
+            playerId: data.playerId,
+            pattern: data.type === 'smash' ? CONFIG.HAPTIC.SMASH : CONFIG.HAPTIC.HIT
+          });
+        } else {
+          // Miss feedback
+          this.channel.publish('haptic', {
+            playerId: data.playerId,
+            pattern: CONFIG.HAPTIC.MISS
+          });
+        }
+      }
+      
+      startGameLoop() {
+        const loop = () => {
+          const now = Date.now();
+          const deltaTime = now - this.lastFrameTime;
+          this.lastFrameTime = now;
+          
+          this.update(deltaTime);
+          this.render();
+          
+          requestAnimationFrame(loop);
+        };
+        
+        loop();
+      }
+      
+      update(deltaTime) {
+        // Update game state
+        const event = this.gameState.update();
+        
+        if (event) {
+          if (event.type === 'score') {
+            this.handleScore(event);
+          }
+        }
+        
+        // Update screen shake
+        if (this.screenShake.duration > 0) {
+          this.screenShake.duration -= deltaTime;
+          const progress = this.screenShake.duration / CONFIG.SMASH_SHAKE_DURATION;
+          this.screenShake.x = (Math.random() - 0.5) * this.screenShake.intensity * progress;
+          this.screenShake.y = (Math.random() - 0.5) * this.screenShake.intensity * progress;
+        } else {
+          this.screenShake.x = 0;
+          this.screenShake.y = 0;
+        }
+        
+        // Update particles
+        this.particles = this.particles.filter(p => {
+          p.life -= deltaTime;
+          p.x += p.vx * deltaTime / 1000;
+          p.y += p.vy * deltaTime / 1000;
+          p.vy += 500 * deltaTime / 1000; // Gravity
+          return p.life > 0;
+        });
+      }
+      
+      render() {
+        const ctx = this.ctx;
+        
+        // Clear canvas
+        ctx.save();
+        ctx.translate(this.screenShake.x, this.screenShake.y);
+        
+        // Draw court background
+        this.drawCourt();
+        
+        // Draw players
+        this.drawPlayers();
+        
+        // Draw shuttlecock
+        this.drawShuttlecock();
+        
+        // Draw particles
+        this.drawParticles();
+        
+        ctx.restore();
+      }
+      
+      drawCourt() {
+        const ctx = this.ctx;
+        
+        // Court background
+        const gradient = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, '#7dd3fc');
+        gradient.addColorStop(1, '#86efac');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Court lines
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+        
+        // Outer boundary
+        ctx.strokeRect(50, 100, 1100, 650);
+        
+        // Service lines
+        ctx.beginPath();
+        ctx.moveTo(50, 300);
+        ctx.lineTo(1150, 300);
+        ctx.moveTo(50, 550);
+        ctx.lineTo(1150, 550);
+        ctx.stroke();
+        
+        // Net
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillRect(CONFIG.NET_POSITION - 5, CONFIG.COURT_HEIGHT - CONFIG.NET_HEIGHT, 10, CONFIG.NET_HEIGHT);
+        
+        // Net mesh pattern
+        ctx.strokeStyle = 'rgba(100,100,100,0.5)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < CONFIG.NET_HEIGHT; i += 20) {
+          ctx.beginPath();
+          ctx.moveTo(CONFIG.NET_POSITION - 5, CONFIG.COURT_HEIGHT - CONFIG.NET_HEIGHT + i);
+          ctx.lineTo(CONFIG.NET_POSITION + 5, CONFIG.COURT_HEIGHT - CONFIG.NET_HEIGHT + i);
+          ctx.stroke();
+        }
+        
+        // Center line
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 10]);
+        ctx.beginPath();
+        ctx.moveTo(CONFIG.NET_POSITION, 100);
+        ctx.lineTo(CONFIG.NET_POSITION, 750);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      
+      drawPlayers() {
+        const ctx = this.ctx;
+        
+        this.gameState.players.forEach((player, playerId) => {
+          const pos = player.position;
+          
+          // Player shadow
+          ctx.fillStyle = 'rgba(0,0,0,0.2)';
+          ctx.beginPath();
+          ctx.ellipse(pos.x, pos.y + 40, 30, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Player body
+          ctx.fillStyle = player.side === 'left' ? '#3b82f6' : '#ef4444';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 30, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Player racket
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(pos.x + 35, pos.y - 20, 20, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Hit zone indicator (debug)
+          if (this.gameState.shuttlecock.isActive) {
+            const inZone = this.gameState.shuttlecock.isInHitZone(pos.x, pos.y);
+            if (inZone) {
+              ctx.strokeStyle = 'rgba(74, 222, 128, 0.5)';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([5, 5]);
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, CONFIG.HIT_ZONE_RADIUS, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          }
+          
+          // Player name
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 14px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(player.side.toUpperCase(), pos.x, pos.y + 60);
+        });
+      }
+      
+      drawShuttlecock() {
+        const ctx = this.ctx;
+        const state = this.gameState.shuttlecock.getState();
+        
+        if (!state.isActive && this.gameState.players.size < 2) return;
+        
+        const pos = state.position;
+        
+        // Draw trail
+        if (state.isPowerShot && state.trail.length > 1) {
+          ctx.strokeStyle = 'rgba(251, 146, 60, 0.6)';
+          ctx.lineWidth = 8;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          
+          ctx.beginPath();
+          ctx.moveTo(state.trail[0].x, state.trail[0].y);
+          
+          for (let i = 1; i < state.trail.length; i++) {
+            ctx.lineTo(state.trail[i].x, state.trail[i].y);
+          }
+          
+          ctx.stroke();
+          
+          // Fire trail effect
+          state.trail.forEach((point, i) => {
+            const alpha = i / state.trail.length;
+            ctx.fillStyle = `rgba(251, 146, 60, ${alpha * 0.5})`;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 10 * alpha, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+        
+        // Shuttlecock shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(pos.x, CONFIG.COURT_HEIGHT, 15, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Shuttlecock body
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(state.rotation);
+        
+        // Cork base
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Feathers
+        ctx.fillStyle = 'white';
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(angle) * 5, Math.sin(angle) * 5);
+          ctx.lineTo(Math.cos(angle) * 15, Math.sin(angle) * 15);
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
+      
+      drawParticles() {
+        const ctx = this.ctx;
+        
+        this.particles.forEach(p => {
+          const alpha = p.life / p.maxLife;
+          ctx.fillStyle = `rgba(${p.color}, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+      
+      createParticles(x, y, isPowerShot) {
+        const count = isPowerShot ? 20 : 10;
+        const color = isPowerShot ? '251, 146, 60' : '74, 222, 128';
+        
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 100 + Math.random() * 200;
+          
+          this.particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 100,
+            size: 3 + Math.random() * 5,
+            life: 500 + Math.random() * 500,
+            maxLife: 1000,
+            color: color
+          });
+        }
+      }
+      
+      triggerScreenShake(intensity, duration) {
+        this.screenShake.intensity = intensity;
+        this.screenShake.duration = duration;
+      }
+      
+      showGameEvent(text) {
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'game-event';
+        eventDiv.textContent = text;
+        document.querySelector('.game-container').appendChild(eventDiv);
+        
+        setTimeout(() => eventDiv.remove(), 1000);
+      }
+      
+      handleScore(event) {
+        // Update score display
+        const players = Array.from(this.gameState.players.keys());
+        const scoringPlayerIndex = players.indexOf(event.scoringPlayer);
+        
+        document.getElementById('score1').textContent = this.gameState.score.player1;
+        document.getElementById('score2').textContent = this.gameState.score.player2;
+        
+        // Show scoring event
+        this.showGameEvent(`POINT! 🎯`);
+        
+        // Broadcast score update
+        this.channel.publish('scoreUpdate', {
+          score: event.score,
+          scoringPlayer: event.scoringPlayer
+        });
+      }
+      
+      updateConnectionStatus(message, connected) {
+        const status = document.getElementById('connectionStatus');
+        status.textContent = message;
+        status.className = connected ? 'connection-status connected' : 'connection-status';
+      }
+    }
+    
+    // Initialize game when page loads
+    let game;
+    window.addEventListener('load', () => {
+      game = new BadmintonGame();
+    });
+  </script>
+</body>
+</html>

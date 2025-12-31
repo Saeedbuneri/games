@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Badminton Racket Controller</title>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="ably-client.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      overflow: hidden;
+      touch-action: none;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100vh;
+      padding: 20px;
+    }
+    
+    .header {
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .status {
+      font-size: 0.9em;
+      opacity: 0.9;
+    }
+    
+    .status.connected {
+      color: #4ade80;
+    }
+    
+    .status.disconnected {
+      color: #f87171;
+    }
+    
+    .main-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .calibration-screen, .game-screen {
+      display: none;
+      width: 100%;
+      text-align: center;
+    }
+    
+    .calibration-screen.active, .game-screen.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .racket-icon {
+      font-size: 6em;
+      margin: 20px 0;
+      animation: float 2s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .instruction {
+      font-size: 1.2em;
+      margin: 20px;
+      line-height: 1.6;
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 15px;
+    }
+    
+    .btn {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 15px 40px;
+      font-size: 1.2em;
+      font-weight: bold;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+    
+    .btn:active {
+      transform: scale(0.95);
+    }
+    
+    .sensor-data {
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    
+    .swing-indicator {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 5px solid rgba(255,255,255,0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 20px 0;
+      position: relative;
+      transition: background 0.1s;
+    }
+    
+    .swing-indicator.hit {
+      background: rgba(74, 222, 128, 0.5);
+      animation: pulse 0.3s;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    
+    .swing-power {
+      font-size: 3em;
+      font-weight: bold;
+    }
+    
+    .player-info {
+      background: rgba(255,255,255,0.2);
+      padding: 10px 20px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+    }
+    
+    .warning {
+      background: rgba(248, 113, 113, 0.3);
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+      border: 2px solid #f87171;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏸 Badminton Racket</h1>
+      <div class="status disconnected" id="status">Connecting...</div>
+      <div class="player-info" id="playerInfo" style="display:none;">Player 1</div>
+    </div>
+    
+    <div class="main-screen">
+      <!-- Setup Screen -->
+      <div class="calibration-screen active" id="setupScreen">
+        <div class="racket-icon">🏸</div>
+        <div class="instruction">
+          <strong>How to Hold Your Phone:</strong><br><br>
+          📱 Hold your phone in portrait mode<br>
+          👋 Screen facing your palm (like a racket handle)<br>
+          ✊ Grip firmly or use a wrist strap<br><br>
+          <strong>⚠️ Warning: Hold tight! Don't throw your phone! ⚠️</strong>
+        </div>
+        <button class="btn" id="calibrateBtn">Start Calibration</button>
+      </div>
+      
+      <!-- Calibration Screen -->
+      <div class="calibration-screen" id="calibrationScreen">
+        <div class="instruction">
+          <strong>Grip Calibration</strong><br><br>
+          Hold the phone like a racket handle and keep it still for 3 seconds...
+        </div>
+        <div class="sensor-data" id="calibrationProgress">
+          Calibrating... 0%
+        </div>
+      </div>
+      
+      <!-- Game Screen -->
+      <div class="game-screen" id="gameScreen">
+        <div class="swing-indicator" id="swingIndicator">
+          <div class="swing-power" id="swingPower">0</div>
+        </div>
+        <div class="sensor-data" id="sensorData">
+          Speed: 0.0 m/s<br>
+          Angle: 0°<br>
+          Type: Ready
+        </div>
+        <div class="warning">
+          Hold tight! Swing naturally!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Phone Controller Logic
+    class PhoneController {
+      constructor() {
+        this.ably = null;
+        this.channel = null;
+        this.playerId = null;
+        this.isCalibrated = false;
+        this.isGameActive = false;
+        
+        // Sensor data
+        this.sensors = {
+          acceleration: { x: 0, y: 0, z: 0 },
+          gyroscope: { alpha: 0, beta: 0, gamma: 0 },
+          magnetometer: { x: 0, y: 0, z: 0 }
+        };
+        
+        // Smoothed sensor data
+        this.smoothed = {
+          accel: { x: 0, y: 0, z: 0 },
+          gyro: { alpha: 0, beta: 0, gamma: 0 }
+        };
+        
+        // Calibration baseline
+        this.baseline = {
+          accel: { x: 0, y: 0, z: 0 },
+          gyro: { alpha: 0, beta: 0, gamma: 0 }
+        };
+        
+        // Swing detection
+        this.lastSwingTime = 0;
+        this.swingCooldown = 300; // ms between swings
+        
+        this.init();
+      }
+      
+      async init() {
+        this.setupUI();
+        await this.connectToAbly();
+        this.requestSensorPermissions();
+      }
+      
+      setupUI() {
+        document.getElementById('calibrateBtn').addEventListener('click', () => {
+          this.startCalibration();
+        });
+      }
+      
+      async connectToAbly() {
+        try {
+          this.ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
+          this.channel = this.ably.channels.get(CONFIG.GAME_CHANNEL);
+          
+          this.ably.connection.on('connected', () => {
+            this.updateStatus('Connected', true);
+            this.playerId = 'player' + Math.random().toString(36).substr(2, 9);
+            this.joinGame();
+          });
+          
+          this.ably.connection.on('disconnected', () => {
+            this.updateStatus('Disconnected', false);
+          });
+          
+          // Listen for game events
+          this.channel.subscribe('gameState', (message) => {
+            // Handle game state updates
+          });
+          
+          this.channel.subscribe('haptic', (message) => {
+            if (message.data.playerId === this.playerId) {
+              this.triggerHaptic(message.data.pattern);
+            }
+          });
+          
+        } catch (error) {
+          console.error('Ably connection error:', error);
+          this.updateStatus('Connection Failed', false);
+        }
+      }
+      
+      joinGame() {
+        this.channel.publish('playerJoin', {
+          playerId: this.playerId,
+          timestamp: Date.now()
+        });
+        
+        document.getElementById('playerInfo').style.display = 'block';
+        document.getElementById('playerInfo').textContent = 'Player: ' + this.playerId.substr(0, 8);
+      }
+      
+      async requestSensorPermissions() {
+        // Request motion sensors permission (iOS 13+)
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+          try {
+            const response = await DeviceMotionEvent.requestPermission();
+            if (response === 'granted') {
+              console.log('Motion sensors granted');
+            }
+          } catch (error) {
+            console.error('Permission error:', error);
+          }
+        }
+        
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          try {
+            const response = await DeviceOrientationEvent.requestPermission();
+            if (response === 'granted') {
+              console.log('Orientation sensors granted');
+            }
+          } catch (error) {
+            console.error('Permission error:', error);
+          }
+        }
+      }
+      
+      startCalibration() {
+        document.getElementById('setupScreen').classList.remove('active');
+        document.getElementById('calibrationScreen').classList.add('active');
+        
+        let samples = [];
+        let sampleCount = 0;
+        const totalSamples = 60; // 3 seconds at ~20Hz
+        
+        const calibrationInterval = setInterval(() => {
+          if (this.sensors.acceleration.x !== 0) {
+            samples.push({
+              accel: { ...this.sensors.acceleration },
+              gyro: { ...this.sensors.gyroscope }
+            });
+            sampleCount++;
+            
+            const progress = Math.round((sampleCount / totalSamples) * 100);
+            document.getElementById('calibrationProgress').textContent = 
+              `Calibrating... ${progress}%\nKeep phone still!`;
+          }
+          
+          if (sampleCount >= totalSamples) {
+            clearInterval(calibrationInterval);
+            this.finishCalibration(samples);
+          }
+        }, 50);
+        
+        this.startSensorListening();
+      }
+      
+      finishCalibration(samples) {
+        // Calculate average baseline
+        let avgAccel = { x: 0, y: 0, z: 0 };
+        let avgGyro = { alpha: 0, beta: 0, gamma: 0 };
+        
+        samples.forEach(sample => {
+          avgAccel.x += sample.accel.x;
+          avgAccel.y += sample.accel.y;
+          avgAccel.z += sample.accel.z;
+          avgGyro.alpha += sample.gyro.alpha || 0;
+          avgGyro.beta += sample.gyro.beta || 0;
+          avgGyro.gamma += sample.gyro.gamma || 0;
+        });
+        
+        this.baseline.accel.x = avgAccel.x / samples.length;
+        this.baseline.accel.y = avgAccel.y / samples.length;
+        this.baseline.accel.z = avgAccel.z / samples.length;
+        this.baseline.gyro.alpha = avgGyro.alpha / samples.length;
+        this.baseline.gyro.beta = avgGyro.beta / samples.length;
+        this.baseline.gyro.gamma = avgGyro.gamma / samples.length;
+        
+        this.isCalibrated = true;
+        this.startGame();
+      }
+      
+      startGame() {
+        document.getElementById('calibrationScreen').classList.remove('active');
+        document.getElementById('gameScreen').classList.add('active');
+        this.isGameActive = true;
+        
+        // Start sending sensor data
+        this.startSensorBroadcast();
+      }
+      
+      startSensorListening() {
+        // Accelerometer
+        window.addEventListener('devicemotion', (event) => {
+          if (event.accelerationIncludingGravity) {
+            this.sensors.acceleration = {
+              x: event.accelerationIncludingGravity.x || 0,
+              y: event.accelerationIncludingGravity.y || 0,
+              z: event.accelerationIncludingGravity.z || 0
+            };
+          }
+        });
+        
+        // Gyroscope
+        window.addEventListener('deviceorientation', (event) => {
+          this.sensors.gyroscope = {
+            alpha: event.alpha || 0,
+            beta: event.beta || 0,
+            gamma: event.gamma || 0
+          };
+        });
+      }
+      
+      startSensorBroadcast() {
+        setInterval(() => {
+          if (!this.isGameActive) return;
+          
+          this.processSensorData();
+          this.detectSwing();
+          this.updateUI();
+        }, CONFIG.SENSOR_UPDATE_RATE);
+      }
+      
+      processSensorData() {
+        // Apply low-pass filter to reduce noise
+        const alpha = CONFIG.SMOOTHING_FACTOR;
+        
+        this.smoothed.accel.x = Utils.lowPassFilter(
+          this.sensors.acceleration.x - this.baseline.accel.x,
+          this.smoothed.accel.x,
+          alpha
+        );
+        this.smoothed.accel.y = Utils.lowPassFilter(
+          this.sensors.acceleration.y - this.baseline.accel.y,
+          this.smoothed.accel.y,
+          alpha
+        );
+        this.smoothed.accel.z = Utils.lowPassFilter(
+          this.sensors.acceleration.z - this.baseline.accel.z,
+          this.smoothed.accel.z,
+          alpha
+        );
+        
+        this.smoothed.gyro.alpha = Utils.lowPassFilter(
+          this.sensors.gyroscope.alpha - this.baseline.gyro.alpha,
+          this.smoothed.gyro.alpha,
+          alpha
+        );
+        this.smoothed.gyro.beta = Utils.lowPassFilter(
+          this.sensors.gyroscope.beta - this.baseline.gyro.beta,
+          this.smoothed.gyro.beta,
+          alpha
+        );
+        this.smoothed.gyro.gamma = Utils.lowPassFilter(
+          this.sensors.gyroscope.gamma - this.baseline.gyro.gamma,
+          this.smoothed.gyro.gamma,
+          alpha
+        );
+      }
+      
+      detectSwing() {
+        const now = Date.now();
+        if (now - this.lastSwingTime < this.swingCooldown) return;
+        
+        // Calculate swing speed (magnitude of acceleration)
+        const speed = Utils.magnitude(
+          this.smoothed.accel.x,
+          this.smoothed.accel.y,
+          this.smoothed.accel.z
+        );
+        
+        // Detect if swing is strong enough
+        if (speed > CONFIG.MIN_SWING_SPEED) {
+          this.lastSwingTime = now;
+          this.sendSwingData(speed);
+        }
+      }
+      
+      sendSwingData(speed) {
+        // Determine swing type
+        let swingType = 'normal';
+        if (speed > CONFIG.SMASH_THRESHOLD) {
+          swingType = 'smash';
+        } else if (speed < CONFIG.DROP_SHOT_THRESHOLD) {
+          swingType = 'drop';
+        }
+        
+        // Calculate swing angle (forehand, backhand, overhead)
+        const angle = this.calculateSwingAngle();
+        
+        // Send to big screen
+        this.channel.publish('swing', {
+          playerId: this.playerId,
+          speed: speed,
+          type: swingType,
+          angle: angle,
+          rotation: this.smoothed.gyro.gamma, // Wrist rotation for slice
+          timestamp: Date.now()
+        });
+        
+        // Visual feedback
+        this.showSwingFeedback(speed, swingType);
+      }
+      
+      calculateSwingAngle() {
+        // Use gyroscope beta and gamma to determine swing direction
+        const beta = this.smoothed.gyro.beta;
+        const gamma = this.smoothed.gyro.gamma;
+        
+        // Simplified angle calculation
+        if (Math.abs(beta) > 45) {
+          return beta > 0 ? 'overhead' : 'underhand';
+        } else if (Math.abs(gamma) > 30) {
+          return gamma > 0 ? 'forehand' : 'backhand';
+        }
+        return 'neutral';
+      }
+      
+      showSwingFeedback(speed, type) {
+        const indicator = document.getElementById('swingIndicator');
+        indicator.classList.add('hit');
+        setTimeout(() => indicator.classList.remove('hit'), 300);
+      }
+      
+      triggerHaptic(pattern) {
+        if ('vibrate' in navigator) {
+          navigator.vibrate(pattern);
+        }
+      }
+      
+      updateUI() {
+        const speed = Utils.magnitude(
+          this.smoothed.accel.x,
+          this.smoothed.accel.y,
+          this.smoothed.accel.z
+        );
+        
+        const angle = Math.round(this.smoothed.gyro.gamma);
+        
+        let type = 'Ready';
+        if (speed > CONFIG.SMASH_THRESHOLD) type = 'SMASH!';
+        else if (speed > CONFIG.DROP_SHOT_THRESHOLD) type = 'Hit';
+        else if (speed > CONFIG.MIN_SWING_SPEED) type = 'Drop Shot';
+        
+        document.getElementById('swingPower').textContent = Math.round(speed);
+        document.getElementById('sensorData').innerHTML = `
+          Speed: ${speed.toFixed(1)} m/s<br>
+          Angle: ${angle}°<br>
+          Type: ${type}
+        `;
+      }
+      
+      updateStatus(message, connected) {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = connected ? 'status connected' : 'status disconnected';
+      }
+    }
+    
+    // Initialize controller when page loads
+    let controller;
+    window.addEventListener('load', () => {
+      controller = new PhoneController();
+    });
+  </script>
+</body>
+</html>

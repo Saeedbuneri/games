@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ably API Test</title>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="ably-client.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .test-panel {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    .log {
+      background: #1e1e1e;
+      color: #00ff00;
+      padding: 15px;
+      border-radius: 5px;
+      font-family: monospace;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      border-left: 3px solid #667eea;
+      padding-left: 10px;
+    }
+    .success { border-color: #4ade80; color: #4ade80; }
+    .error { border-color: #f87171; color: #f87171; }
+    .info { border-color: #60a5fa; color: #60a5fa; }
+    h2 { color: #667eea; }
+    .status {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .status.connected {
+      background: #4ade80;
+      color: white;
+    }
+    .status.disconnected {
+      background: #f87171;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Ably REST API Test</h1>
+  
+  <div class="test-panel">
+    <h2>Connection Status</h2>
+    <span class="status disconnected" id="status">Disconnected</span>
+    <p style="margin-top: 10px;">
+      <strong>API Key:</strong> <code id="apiKey">Loading...</code><br>
+      <strong>Channel:</strong> <code id="channel">Loading...</code>
+    </p>
+  </div>
+
+  <div class="test-panel">
+    <h2>Test Actions</h2>
+    <button onclick="testConnection()">🔌 Test Connection</button>
+    <button onclick="testPublish()">📤 Publish Test Message</button>
+    <button onclick="testSubscribe()">📥 Subscribe to Channel</button>
+    <button onclick="clearLog()">🗑️ Clear Log</button>
+  </div>
+
+  <div class="test-panel">
+    <h2>Event Log</h2>
+    <div class="log" id="log">
+      <div class="log-entry info">Waiting for actions...</div>
+    </div>
+  </div>
+
+  <script>
+    let ably = null;
+    let channel = null;
+    let isSubscribed = false;
+
+    // Initialize on load
+    window.addEventListener('load', () => {
+      document.getElementById('apiKey').textContent = CONFIG.ABLY_API_KEY.substring(0, 20) + '...';
+      document.getElementById('channel').textContent = CONFIG.GAME_CHANNEL;
+      log('Ready! Click "Test Connection" to start.', 'info');
+    });
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const timestamp = new Date().toLocaleTimeString();
+      entry.textContent = `[${timestamp}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    async function testConnection() {
+      log('Initializing Ably client...', 'info');
+      
+      try {
+        ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
+        channel = ably.channels.get(CONFIG.GAME_CHANNEL);
+        
+        ably.connection.on('connected', () => {
+          log('✓ Connected to Ably!', 'success');
+          document.getElementById('status').className = 'status connected';
+          document.getElementById('status').textContent = 'Connected';
+        });
+        
+        ably.connection.on('disconnected', () => {
+          log('✗ Disconnected from Ably', 'error');
+          document.getElementById('status').className = 'status disconnected';
+          document.getElementById('status').textContent = 'Disconnected';
+        });
+        
+        log('Connection initialized. Waiting for status...', 'info');
+        
+        // Test with direct fetch
+        setTimeout(() => testDirectFetch(), 1000);
+        
+      } catch (error) {
+        log('✗ Connection failed: ' + error.message, 'error');
+      }
+    }
+
+    async function testDirectFetch() {
+      log('Testing direct REST API call...', 'info');
+      
+      try {
+        const url = `https://rest.ably.io/channels/${encodeURIComponent(CONFIG.GAME_CHANNEL)}/messages`;
+        const auth = 'Basic ' + btoa(CONFIG.ABLY_API_KEY);
+        
+        log(`URL: ${url}`, 'info');
+        log(`Auth: ${auth.substring(0, 30)}...`, 'info');
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': auth
+          },
+          body: JSON.stringify({
+            name: 'test',
+            data: { message: 'Direct API test', timestamp: Date.now() }
+          })
+        });
+
+        if (response.ok) {
+          log('✓ Direct REST API call successful!', 'success');
+          const result = await response.text();
+          log(`Response: ${result || 'Empty (OK)'}`, 'info');
+        } else {
+          const errorText = await response.text();
+          log(`✗ REST API error: ${response.status} ${response.statusText}`, 'error');
+          log(`Error details: ${errorText}`, 'error');
+        }
+      } catch (error) {
+        log(`✗ Fetch error: ${error.message}`, 'error');
+      }
+    }
+
+    async function testPublish() {
+      if (!channel) {
+        log('✗ Not connected! Click "Test Connection" first.', 'error');
+        return;
+      }
+      
+      log('Publishing test message...', 'info');
+      
+      const testData = {
+        test: true,
+        message: 'Hello from test page!',
+        timestamp: Date.now(),
+        random: Math.random()
+      };
+      
+      try {
+        const success = await channel.publish('testEvent', testData);
+        
+        if (success) {
+          log('✓ Message published successfully!', 'success');
+          log(`Data: ${JSON.stringify(testData)}`, 'info');
+        } else {
+          log('✗ Publish failed', 'error');
+        }
+      } catch (error) {
+        log(`✗ Publish error: ${error.message}`, 'error');
+      }
+    }
+
+    function testSubscribe() {
+      if (!channel) {
+        log('✗ Not connected! Click "Test Connection" first.', 'error');
+        return;
+      }
+      
+      if (isSubscribed) {
+        log('Already subscribed to channel events', 'info');
+        return;
+      }
+      
+      log('Subscribing to channel events...', 'info');
+      
+      // Subscribe to all test events
+      channel.subscribe('testEvent', (message) => {
+        log('📨 Received testEvent:', 'success');
+        log(`   Data: ${JSON.stringify(message.data)}`, 'info');
+      });
+      
+      channel.subscribe('swing', (message) => {
+        log('📨 Received swing event:', 'success');
+        log(`   Player: ${message.data.playerId}`, 'info');
+        log(`   Speed: ${message.data.speed}`, 'info');
+      });
+      
+      channel.subscribe('playerJoin', (message) => {
+        log('📨 Player joined:', 'success');
+        log(`   ID: ${message.data.playerId}`, 'info');
+      });
+      
+      isSubscribed = true;
+      log('✓ Subscribed to channel events!', 'success');
+      log('Try opening the game in another tab to see events', 'info');
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '<div class="log-entry info">Log cleared.</div>';
+    }
+  </script>
+</body>
+</html>
