@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connection Test</title>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      color: white;
+    }
+    .log {
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 14px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+    .info { color: #60a5fa; }
+    button {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <h1>🏸 Badminton Connection Test</h1>
+  
+  <div>
+    <button onclick="testHostConnection()">Test Host Connection</button>
+    <button onclick="testControllerConnection()">Test Controller Connection</button>
+    <button onclick="clearLog()">Clear Log</button>
+  </div>
+  
+  <div id="log" class="log"></div>
+  
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="ably-client.js"></script>
+  <script src="room-manager.js"></script>
+  
+  <script>
+    const log = document.getElementById('log');
+    
+    function addLog(message, type = 'info') {
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = type;
+      entry.textContent = `[${time}] ${message}`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+      console.log(message);
+    }
+    
+    function clearLog() {
+      log.innerHTML = '';
+    }
+    
+    async function testHostConnection() {
+      addLog('=== HOST CONNECTION TEST ===', 'info');
+      
+      try {
+        // Generate room
+        const roomManager = new RoomManager();
+        const roomCode = roomManager.generateRoomCode();
+        addLog(`Room code generated: ${roomCode}`, 'success');
+        
+        // Connect to Ably
+        addLog('Connecting to Ably...', 'info');
+        const ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
+        const channelName = `badminton-room-${roomCode}`;
+        const channel = ably.channels.get(channelName);
+        
+        // Set up connection listener
+        ably.connection.on('connected', () => {
+          addLog('✓ Host connected to Ably!', 'success');
+        });
+        
+        // Subscribe to player join requests
+        addLog('Subscribing to playerJoinRequest...', 'info');
+        channel.subscribe('playerJoinRequest', (message) => {
+          addLog(`✓ Received player join request: ${JSON.stringify(message.data)}`, 'success');
+          
+          // Send acceptance
+          channel.publish('playerJoinAccepted', {
+            playerId: message.data.playerId,
+            playerNumber: 1
+          });
+          addLog('Sent playerJoinAccepted', 'info');
+        });
+        
+        addLog('Host is ready and listening...', 'success');
+        addLog(`Share this room code: ${roomCode}`, 'info');
+        
+        // Store for controller test
+        window.testRoomCode = roomCode;
+        
+      } catch (error) {
+        addLog(`✗ Error: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testControllerConnection() {
+      if (!window.testRoomCode) {
+        addLog('✗ Please run Host test first to get room code', 'error');
+        return;
+      }
+      
+      addLog('=== CONTROLLER CONNECTION TEST ===', 'info');
+      
+      try {
+        const roomCode = window.testRoomCode;
+        addLog(`Joining room: ${roomCode}`, 'info');
+        
+        // Connect to Ably
+        const ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
+        const channelName = `badminton-room-${roomCode}`;
+        const channel = ably.channels.get(channelName);
+        const playerId = 'test-player-' + Math.random().toString(36).substr(2, 9);
+        
+        // Set up connection listener
+        ably.connection.on('connected', () => {
+          addLog('✓ Controller connected to Ably!', 'success');
+          
+          // Wait a bit then send join request
+          setTimeout(() => {
+            addLog('Sending playerJoinRequest...', 'info');
+            channel.publish('playerJoinRequest', {
+              playerId: playerId,
+              playerName: 'Test Player'
+            });
+          }, 1500);
+        });
+        
+        // Subscribe to join acceptance
+        addLog('Subscribing to playerJoinAccepted...', 'info');
+        channel.subscribe('playerJoinAccepted', (message) => {
+          if (message.data.playerId === playerId) {
+            addLog(`✓ Received join acceptance! Player #${message.data.playerNumber}`, 'success');
+            addLog('CONNECTION TEST SUCCESSFUL! 🎉', 'success');
+          }
+        });
+        
+      } catch (error) {
+        addLog(`✗ Error: ${error.message}`, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

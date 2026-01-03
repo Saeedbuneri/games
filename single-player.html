@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🤖 Play vs Robot - Main Screen</title>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="room-manager.js"></script>
+  <script src="ably-client.js"></script>
+  <script src="physics.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    body::-webkit-scrollbar,
+    .setup-card::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Hide scrollbar for IE, Edge and Firefox */
+    body,
+    .setup-card {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      background-size: 400% 400%;
+      animation: gradient-flow 15s ease infinite;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color: white;
+      position: relative;
+      min-height: 100vh;
+    }
+    
+    @keyframes gradient-flow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.1) 0%, transparent 50%);
+      animation: rotate-bg 30s linear infinite;
+      pointer-events: none;
+    }
+    
+    @keyframes rotate-bg {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .setup-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .setup-screen::before {
+      content: '🏸';
+      position: absolute;
+      font-size: 3em;
+      opacity: 0.1;
+      animation: float-icon 8s ease-in-out infinite;
+      top: 10%;
+      left: 10%;
+    }
+    
+    .setup-screen::after {
+      content: '🤖';
+      position: absolute;
+      font-size: 4em;
+      opacity: 0.1;
+      animation: float-icon 10s ease-in-out infinite reverse;
+      bottom: 10%;
+      right: 10%;
+    }
+    
+    @keyframes float-icon {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(20px, -30px) rotate(10deg); }
+      50% { transform: translate(-20px, -60px) rotate(-10deg); }
+      75% { transform: translate(30px, -30px) rotate(5deg); }
+    }
+    
+    .setup-card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(20px);
+      border-radius: 30px;
+      padding: 40px 30px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5),
+                  0 0 100px rgba(102, 126, 234, 0.2),
+                  inset 0 0 100px rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255,255,255,0.15);
+      animation: card-entrance 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+    }
+    
+    @keyframes card-entrance {
+      from {
+        opacity: 0;
+        transform: scale(0.8) translateY(50px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    
+    .setup-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+      animation: shimmer 3s linear infinite;
+    }
+    
+    @keyframes shimmer {
+      from { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+      to { transform: translateX(100%) translateY(100%) rotate(45deg); }
+    }
+    
+    .room-code-display {
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.98));
+      color: #0f172a;
+      padding: 30px;
+      border-radius: 20px;
+      margin: 30px 0;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3),
+                  inset 0 -5px 20px rgba(102, 126, 234, 0.1);
+      animation: card-float 3s ease-in-out infinite;
+      position: relative;
+      z-index: 1;
+    }
+    
+    @keyframes card-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    
+    .room-code {
+      font-size: 3em;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      background: linear-gradient(135deg, #667eea, #764ba2, #667eea);
+      background-size: 200% 200%;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradient-move 3s ease infinite;
+      text-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    @keyframes gradient-move {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
+    .qr-container {
+      background: white;
+      padding: 20px;
+      border-radius: 20px;
+      display: inline-block;
+      margin: 20px 0;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .qr-container:hover {
+      transform: scale(1.05) rotate(2deg);
+      box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4);
+    }
+    
+    .start-button {
+      background: linear-gradient(135deg, #4ade80, #22c55e, #4ade80);
+      background-size: 200% 200%;
+      border: none;
+      padding: 20px 60px;
+      border-radius: 50px;
+      font-size: 1.5em;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(74,222,128,0.4);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      margin-top: 20px;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+      animation: gradient-slide 3s ease infinite;
+    }
+    
+    @keyframes gradient-slide {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
+    .start-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: left 0.5s;
+    }
+    
+    .start-button:hover::before {
+      left: 100%;
+    }
+    
+    .start-button:hover:not(:disabled) {
+      transform: translateY(-5px) scale(1.05);
+      box-shadow: 0 20px 50px rgba(74,222,128,0.6),
+                  0 0 50px rgba(74,222,128,0.3);
+    }
+    
+    .start-button:active:not(:disabled) {
+      transform: translateY(-2px) scale(1.02);
+    }
+    
+    .start-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(50%);
+      animation: none;
+    }
+    
+    .game-screen {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    
+    .game-screen.active {
+      display: block;
+    }
+    
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    .game-hud {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 100px;
+      align-items: center;
+      background: rgba(0,0,0,0.6);
+      padding: 20px 40px;
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5),
+                  0 0 100px rgba(102, 126, 234, 0.2);
+      border: 2px solid rgba(255,255,255,0.1);
+      animation: hud-entrance 0.8s ease-out;
+    }
+    
+    @keyframes hud-entrance {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+    
+    .player-info {
+      text-align: center;
+      min-width: 120px;
+    }
+    
+    .player-name {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    
+    .player-score {
+      font-size: 3em;
+      font-weight: 800;
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(74, 222, 128, 0.5));
+      transition: all 0.3s ease;
+    }
+    
+    .player-score:hover {
+      transform: scale(1.1);
+      filter: drop-shadow(0 0 30px rgba(74, 222, 128, 0.8));
+    }
+    
+    .game-event {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 4em;
+      font-weight: 800;
+      background: linear-gradient(45deg, #fff, #fbbf24, #fff);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(0,0,0,0.8);
+      animation: eventPop 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      pointer-events: none;
+      filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.8));
+    }
+    
+    @keyframes eventPop {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.3) rotate(-10deg);
+      }
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.3) rotate(5deg);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+      }
+    }
+    
+    .connection-status {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: rgba(239, 68, 68, 0.3);
+      font-size: 0.9em;
+    }
+    
+    .connection-status.connected {
+      background: rgba(74, 222, 128, 0.3);
+    }
+    
+    .back-button {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(255,255,255,0.3);
+      padding: 10px 20px;
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .back-button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    
+    .difficulty-selector {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin: 30px 0;
+    }
+    
+    .difficulty-btn {
+      padding: 15px 30px;
+      border: 2px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      font-size: 1em;
+      font-weight: 600;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .difficulty-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.5s, height 0.5s;
+    }
+    
+    .difficulty-btn:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      border-color: rgba(102, 126, 234, 0.6);
+    }
+    
+    .difficulty-btn:hover::before {
+      width: 200px;
+      height: 200px;
+    }
+    
+    .difficulty-btn.selected {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-color: #667eea;
+      box-shadow: 0 0 30px rgba(102, 126, 234, 0.6),
+                  0 0 60px rgba(118, 75, 162, 0.4),
+                  inset 0 0 20px rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+      animation: glow-pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes glow-pulse {
+      0%, 100% { box-shadow: 0 0 30px rgba(102, 126, 234, 0.6), 0 0 60px rgba(118, 75, 162, 0.4); }
+      50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.8), 0 0 80px rgba(118, 75, 162, 0.6); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Setup Screen -->
+  <div class="setup-screen" id="setupScreen">
+    <div class="setup-card">
+      <h1 style="font-size: 3em; margin-bottom: 20px;">🤖 Play vs Robot</h1>
+      <p style="font-size: 1.3em; opacity: 0.8; margin-bottom: 30px;">Single Player - Main Screen Display</p>
+      <div style="background: rgba(102, 126, 234, 0.2); padding: 15px; border-radius: 10px; margin-bottom: 20px; font-size: 0.95em;">
+        <strong>📺 This is the Main Screen</strong> - Game will display here on your TV/Computer
+      </div>
+      
+      <div style="margin: 30px 0;">
+        <h3 style="margin-bottom: 15px; position: relative; z-index: 1;">Select Difficulty</h3>
+        <div class="difficulty-selector">
+          <button class="difficulty-btn selected" onclick="selectDifficulty('easy')" id="btn-easy">
+            😊 Easy
+          </button>
+          <button class="difficulty-btn" onclick="selectDifficulty('medium')" id="btn-medium">
+            😐 Medium
+          </button>
+          <button class="difficulty-btn" onclick="selectDifficulty('hard')" id="btn-hard">
+            😤 Hard
+          </button>
+        </div>
+        <p style="font-size: 0.9em; opacity: 0.7; margin-top: 15px; position: relative; z-index: 1;" id="difficultyDescription">
+          Perfect for beginners - Robot reacts slower
+        </p>
+      </div>
+      
+      <div class="room-code-display">
+        <p style="font-size: 1.2em; margin-bottom: 10px; color: #64748b;">Connect Your Controller</p>
+        <div class="room-code" id="roomCode">LOADING</div>
+        <p style="font-size: 0.9em; margin-top: 15px; color: #64748b;">Scan QR code with your phone</p>
+      </div>
+      
+      <div class="qr-container">
+        <canvas id="qrCode"></canvas>
+      </div>
+      
+      <div style="margin: 20px 0; padding: 20px; background: rgba(102,126,234,0.2); border-radius: 15px; position: relative; z-index: 1;">
+        <p style="font-size: 1.1em; font-weight: 600; margin-bottom: 10px;">📱 Controller Connection:</p>
+        <p id="playerStatus" style="font-size: 1em;">⏳ Waiting for your phone controller...</p>
+        <div style="margin-top: 15px; font-size: 0.85em; opacity: 0.9; line-height: 1.6; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+          <div style="font-weight: 600; margin-bottom: 8px; font-size: 1em; color: #4ade80;">🎮 How to Connect:</div>
+          <div style="margin: 5px 0;">1️⃣ Grab your smartphone</div>
+          <div style="margin: 5px 0;">2️⃣ Scan the QR code above</div>
+          <div style="margin: 5px 0;">3️⃣ Use your phone as a badminton racket!</div>
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2); color: #fbbf24;">📺 Game will play on THIS screen</div>
+        </div>
+      </div>
+      
+      <button class="start-button" id="startButton" onclick="startGame()" disabled>
+        🎮 START GAME
+      </button>
+      
+      <button class="back-button" onclick="goBack()">← Back to Menu</button>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div class="game-screen" id="gameScreen">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="game-hud">
+      <div class="player-info">
+        <div class="player-name" id="player1Name">You</div>
+        <div class="player-score" id="score1">0</div>
+      </div>
+      <div style="font-size: 2em; opacity: 0.5;">VS</div>
+      <div class="player-info">
+        <div class="player-name" id="player2Name">🤖 Robot</div>
+        <div class="player-score" id="score2">0</div>
+      </div>
+    </div>
+    
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
+    
+    <button class="back-button" onclick="endGame()">← End Game</button>
+  </div>
+
+  <!-- QR Code Generator -->
+  <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+  <script>
+    if (typeof QRCodeGenerator === 'undefined') {
+      window.QRCodeGenerator = {
+        generateCanvas: function(text, canvas, size) {
+          const qr = qrcode(0, 'M');
+          qr.addData(text);
+          qr.make();
+          
+          const cellSize = Math.floor(size / qr.getModuleCount());
+          const finalSize = cellSize * qr.getModuleCount();
+          
+          canvas.width = finalSize;
+          canvas.height = finalSize;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, finalSize, finalSize);
+          
+          ctx.fillStyle = 'black';
+          for (let row = 0; row < qr.getModuleCount(); row++) {
+            for (let col = 0; col < qr.getModuleCount(); col++) {
+              if (qr.isDark(row, col)) {
+                ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+              }
+            }
+          }
+        }
+      };
+    }
+  </script>
+  <script src="single-player.js"></script>
+</body>
+</html>

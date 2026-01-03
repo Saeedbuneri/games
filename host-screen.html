@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏸 Game Host - Badminton</title>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="room-manager.js"></script>
+  <script src="ably-client.js"></script>
+  <script src="physics.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    body::-webkit-scrollbar,
+    .setup-card::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Hide scrollbar for IE, Edge and Firefox */
+    body,
+    .setup-card {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      background-size: 400% 400%;
+      animation: gradient-shift 15s ease infinite;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color: white;
+      position: relative;
+      min-height: 100vh;
+    }
+    
+    @keyframes gradient-shift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 30% 50%, rgba(102, 126, 234, 0.15), transparent 40%),
+        radial-gradient(circle at 70% 80%, rgba(118, 75, 162, 0.15), transparent 40%);
+      animation: pulse-bg 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    
+    @keyframes pulse-bg {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    
+    .setup-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px;
+    }
+    
+    .setup-card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(20px);
+      border-radius: 30px;
+      padding: 40px 30px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5),
+                  0 0 80px rgba(102, 126, 234, 0.2),
+                  inset 0 0 100px rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255,255,255,0.15);
+      animation: card-float 3s ease-in-out infinite;
+      position: relative;
+      z-index: 1;
+    }
+    
+    @keyframes card-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .room-code-display {
+      background: white;
+      color: #0f172a;
+      padding: 30px;
+      border-radius: 20px;
+      margin: 30px 0;
+    }
+    
+    .room-code {
+      font-size: 4em;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      background: linear-gradient(135deg, #667eea, #764ba2, #667eea);
+      background-size: 200% 200%;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 2px 10px rgba(102,126,234,0.3);
+      animation: gradient-flow 3s ease infinite, scale-pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes gradient-flow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
+    @keyframes scale-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .qr-container {
+      background: white;
+      padding: 20px;
+      border-radius: 20px;
+      display: inline-block;
+      margin: 20px 0;
+    }
+    
+    #qrCode img {
+      display: block;
+    }
+    
+    .player-list {
+      background: rgba(255,255,255,0.05);
+      border-radius: 15px;
+      padding: 20px;
+      margin: 20px 0;
+      min-height: 100px;
+    }
+    
+    .player-item {
+      background: linear-gradient(135deg, rgba(102,126,234,0.3), rgba(118,75,162,0.3));
+      padding: 15px 20px;
+      border-radius: 10px;
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+    
+    .player-item:hover {
+      transform: translateX(10px);
+      background: linear-gradient(135deg, rgba(102,126,234,0.4), rgba(118,75,162,0.4));
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .player-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+    }
+    
+    .start-button {
+      background: linear-gradient(135deg, #4ade80, #22c55e, #4ade80);
+      background-size: 200% 200%;
+      border: none;
+      padding: 20px 60px;
+      border-radius: 50px;
+      font-size: 1.5em;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(74,222,128,0.4);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      margin-top: 20px;
+      animation: button-glow 3s ease infinite;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    @keyframes button-glow {
+      0%, 100% { 
+        background-position: 0% 50%;
+        box-shadow: 0 10px 30px rgba(74,222,128,0.4);
+      }
+      50% { 
+        background-position: 100% 50%;
+        box-shadow: 0 10px 40px rgba(74,222,128,0.6), 0 0 60px rgba(74,222,128,0.3);
+      }
+    }
+    
+    .start-button::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: rotate(45deg);
+      animation: shine 3s linear infinite;
+    }
+    
+    @keyframes shine {
+      from { transform: translateX(-100%) rotate(45deg); }
+      to { transform: translateX(100%) rotate(45deg); }
+    }
+    
+    .start-button:hover:not(:disabled) {
+      transform: translateY(-5px) scale(1.05);
+      box-shadow: 0 20px 50px rgba(74,222,128,0.6),
+                  0 0 80px rgba(74,222,128,0.4);
+    }
+    
+    .start-button:active:not(:disabled) {
+      transform: translateY(-2px) scale(1.02);
+    }
+    
+    .start-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(50%);
+      animation: none;
+      background: linear-gradient(135deg, #64748b, #475569);
+    }
+    
+    .game-screen {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    
+    .game-screen.active {
+      display: block;
+    }
+    
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    .hud {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 40px;
+      z-index: 10;
+    }
+    
+    .score-panel {
+      background: rgba(15,23,42,0.95);
+      backdrop-filter: blur(10px);
+      padding: 25px 50px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 2px solid rgba(102,126,234,0.5);
+      text-align: center;
+      min-width: 180px;
+    }
+    
+    .player-name {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    
+    .score {
+      font-size: 4em;
+      font-weight: 800;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .game-event {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 5em;
+      font-weight: 800;
+      color: white;
+      text-shadow: 0 0 30px rgba(102,126,234,0.8);
+      z-index: 50;
+      animation: eventPop 1s ease-out;
+      pointer-events: none;
+    }
+    
+    @keyframes eventPop {
+      0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+      50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+    
+    .connection-status {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(15,23,42,0.9);
+      padding: 12px 25px;
+      border-radius: 15px;
+      font-size: 0.9em;
+      border: 2px solid rgba(248, 113, 113, 0.5);
+      z-index: 10;
+    }
+    
+    .connection-status.connected {
+      border-color: rgba(74, 222, 128, 0.5);
+      color: #4ade80;
+    }
+    
+    .room-code-corner {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(15,23,42,0.95);
+      padding: 15px 30px;
+      border-radius: 15px;
+      border: 2px solid rgba(102,126,234,0.5);
+      z-index: 10;
+    }
+    
+    .room-code-corner .label {
+      font-size: 0.8em;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    
+    .room-code-corner .code {
+      font-size: 1.8em;
+      font-weight: 800;
+      color: #667eea;
+      letter-spacing: 0.15em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Setup Screen -->
+  <div class="setup-screen" id="setupScreen">
+    <div class="setup-card">
+      <h1 style="font-size: 2.5em; margin-bottom: 20px;">🏸 Create Game Room</h1>
+      
+      <div class="room-code-display">
+        <div style="font-size: 1.2em; color: #64748b; margin-bottom: 10px; font-weight: 600;">ROOM CODE</div>
+        <div class="room-code" id="roomCode">------</div>
+      </div>
+      
+      <div class="qr-container">
+        <div id="qrCode"></div>
+        <div style="margin-top: 10px; color: #64748b;">Scan to join</div>
+      </div>
+      
+      <h3 style="margin: 30px 0 15px; color: #94a3b8;">Waiting for Players...</h3>
+      <div class="player-list" id="playerList">
+        <div style="color: #64748b; font-size: 0.95em;">No players yet. Share the room code!</div>
+      </div>
+      
+      <button class="start-button" id="startButton" disabled onclick="startGame()">
+        🚀 START GAME
+      </button>
+      
+      <div style="margin-top: 20px; color: #94a3b8; font-size: 0.9em;">
+        Need at least 2 players to start
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div class="game-screen" id="gameScreen">
+    <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+    
+    <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100;">
+      <button onclick="pauseBadmintonGame()" style="padding: 10px 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s;">⏸️ Pause</button>
+      <button onclick="showBadmintonQuitConfirm()" style="padding: 10px 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s;">🚪 Quit</button>
+    </div>
+    
+    <div class="room-code-corner">
+      <div class="label">ROOM</div>
+      <div class="code" id="gameRoomCode">------</div>
+    </div>
+    
+    <div class="hud">
+      <div class="score-panel">
+        <div class="player-name" id="player1Name">Player 1</div>
+        <div class="score" id="score1">0</div>
+      </div>
+      <div class="score-panel">
+        <div class="player-name" id="player2Name">Player 2</div>
+        <div class="score" id="score2">0</div>
+      </div>
+    </div>
+    
+    <div class="connection-status" id="connectionStatus">
+      Connecting...
+    </div>
+  </div>
+
+  <!-- Pause Menu -->
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 1000;" id="badmintonPauseMenu">
+    <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); border-radius: 25px; padding: 50px; text-align: center; border: 2px solid rgba(255,255,255,0.3); max-width: 600px;">
+      <h1 style="font-size: 3em; margin-bottom: 20px;">⏸️ PAUSED</h1>
+      <p style="font-size: 1.2em; opacity: 0.8; margin-bottom: 30px;">Game is paused</p>
+      <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+        <button onclick="resumeBadmintonGame()" style="padding: 15px 30px; border: none; border-radius: 15px; font-size: 1.1em; font-weight: 600; cursor: pointer; background: linear-gradient(135deg, #667eea, #764ba2); color: white;">▶️ Resume</button>
+        <button onclick="restartBadmintonGame()" style="padding: 15px 30px; border: none; border-radius: 15px; font-size: 1.1em; font-weight: 600; cursor: pointer; background: linear-gradient(135deg, #667eea, #764ba2); color: white;">🔄 Restart</button>
+        <button onclick="quitBadmintonToMenu()" style="padding: 15px 30px; border: none; border-radius: 15px; font-size: 1.1em; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.1); color: white; border: 2px solid rgba(255,255,255,0.3);">🚪 Quit to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 1000;" id="badmintonGameOver">
+    <div id="badmintonGameOverCard" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); border-radius: 25px; padding: 50px; text-align: center; border: 2px solid rgba(255,255,255,0.3); max-width: 600px;">
+      <!-- Dynamic content -->
+    </div>
+  </div>
+
+  <!-- QR Code Library -->
+  <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+  <script>
+    if (typeof QRCodeGenerator === 'undefined') {
+      window.QRCodeGenerator = {
+        generateCanvas: function(text, canvas, size) {
+          const qr = qrcode(0, 'M');
+          qr.addData(text);
+          qr.make();
+          
+          const cellSize = Math.floor(size / qr.getModuleCount());
+          const finalSize = cellSize * qr.getModuleCount();
+          
+          canvas.width = finalSize;
+          canvas.height = finalSize;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, finalSize, finalSize);
+          
+          ctx.fillStyle = 'black';
+          for (let row = 0; row < qr.getModuleCount(); row++) {
+            for (let col = 0; col < qr.getModuleCount(); col++) {
+              if (qr.isDark(row, col)) {
+                ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+              }
+            }
+          }
+        }
+      };
+    }
+  </script>
+  <script src="host-screen.js"></script>
+</body>
+</html>

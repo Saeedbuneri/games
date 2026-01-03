@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🎮 Controller - Badminton</title>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="room-manager.js"></script>
+  <script src="ably-client.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    body::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Hide scrollbar for IE, Edge and Firefox */
+    body {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+    
+    @keyframes slideUp {
+      from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+      }
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      overflow: hidden;
+      touch-action: none;
+    }
+    
+    .screen {
+      display: none;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(20px);
+      border-radius: 25px;
+      padding: 40px 30px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    h1 {
+      font-size: 2.5em;
+      text-align: center;
+      margin-bottom: 30px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    
+    .input-group {
+      margin: 20px 0;
+    }
+    
+    .input-group label {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: 600;
+      font-size: 1.1em;
+    }
+    
+    .input-group input {
+      width: 100%;
+      padding: 15px 20px;
+      font-size: 1.5em;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 15px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      text-align: center;
+      letter-spacing: 0.3em;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    
+    .input-group input::placeholder {
+      color: rgba(255,255,255,0.5);
+      letter-spacing: normal;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 18px;
+      font-size: 1.3em;
+      font-weight: 700;
+      border: none;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 20px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      color: white;
+      box-shadow: 0 10px 30px rgba(74,222,128,0.4);
+    }
+    
+    .btn-primary:active {
+      transform: translateY(2px);
+    }
+    
+    .btn-secondary {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    
+    .permission-box {
+      background: rgba(248, 113, 113, 0.2);
+      border: 2px solid rgba(248, 113, 113, 0.5);
+      border-radius: 15px;
+      padding: 20px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    
+    .permission-icon {
+      font-size: 3em;
+      margin-bottom: 10px;
+    }
+    
+    .swing-display {
+      width: 100%;
+      height: 60vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .swing-indicator {
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      border: 5px solid rgba(255,255,255,0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.1s;
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .swing-indicator.hit {
+      background: rgba(74, 222, 128, 0.5);
+      border-color: #4ade80;
+      animation: pulse 0.3s;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    
+    .power-value {
+      font-size: 4em;
+      font-weight: 800;
+    }
+    
+    .power-label {
+      font-size: 1.2em;
+      opacity: 0.8;
+      margin-top: 10px;
+    }
+    
+    .sensor-info {
+      background: rgba(0,0,0,0.3);
+      padding: 20px;
+      border-radius: 15px;
+      margin-top: 20px;
+      font-family: monospace;
+      font-size: 0.9em;
+      text-align: center;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 0.9em;
+      font-weight: 600;
+      margin: 10px 0;
+    }
+    
+    .status-badge.connected {
+      background: rgba(74, 222, 128, 0.3);
+      border: 2px solid #4ade80;
+    }
+    
+    .status-badge.disconnected {
+      background: rgba(248, 113, 113, 0.3);
+      border: 2px solid #f87171;
+    }
+  </style>
+</head>
+<body>
+  <!-- Room Code Entry Screen -->
+  <div class="screen active" id="codeEntryScreen">
+    <div class="card">
+      <h1>🎮 Join Game</h1>
+      
+      <div class="input-group">
+        <label>Enter Room Code</label>
+        <input type="text" id="roomCodeInput" placeholder="ABCD12" maxlength="6" autocomplete="off">
+      </div>
+      
+      <button class="btn btn-primary" onclick="joinRoom()">Join Game</button>
+      
+      <div style="text-align: center; margin: 20px 0; color: rgba(255,255,255,0.7);">
+        - OR -
+      </div>
+      
+      <button class="btn btn-secondary" onclick="scanQRCode()">📷 Scan QR Code</button>
+      
+      <div style="margin-top: 20px; text-align: center; font-size: 0.9em; opacity: 0.8;">
+        Get the room code from the main screen
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission Request Screen -->
+  <div class="screen" id="permissionScreen">
+    <div class="card">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <span style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 8px 20px; border-radius: 20px; font-size: 0.9em; font-weight: 600;" id="playerBadge">
+          You are Player <span id="playerNumberDisplay">?</span>
+        </span>
+      </div>
+      
+      <h1>🔐 Permissions</h1>
+      
+      <div class="permission-box">
+        <div class="permission-icon">📱</div>
+        <h3 style="margin-bottom: 10px;">Motion Sensors Required</h3>
+        <p style="font-size: 0.95em; opacity: 0.9;">
+          This game needs access to your phone's motion sensors to detect racket swings.
+        </p>
+        <div style="margin-top: 15px; font-size: 0.85em; opacity: 0.7;" id="sensorStatus">
+          Checking sensor availability...
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="requestPermissions()">
+        ✓ Grant Permissions
+      </button>
+      
+      <div style="margin-top: 20px; text-align: center; font-size: 0.85em; opacity: 0.8;">
+        Your sensor data is only used for gameplay and never stored or shared.
+      </div>
+    </div>
+  </div>
+
+  <!-- Calibration Screen -->
+  <div class="screen" id="calibrationScreen">
+    <div class="card">
+      <h1>⚖️ Calibration</h1>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <div style="font-size: 3em; margin-bottom: 20px;">📱</div>
+        <h3 style="margin-bottom: 15px;">Hold Your Phone Still</h3>
+        <p style="font-size: 1.1em; line-height: 1.6;">
+          Keep your phone in portrait mode like a racket handle. Hold it steady for 3 seconds.
+        </p>
+      </div>
+      
+      <div class="sensor-info">
+        <div id="calibrationProgress">Ready to calibrate...</div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="startCalibration()" id="calibrateBtn">
+        Start Calibration
+      </button>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div class="screen" id="gameScreen">
+    <div class="swing-display">
+      <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); padding: 10px 20px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.3);">
+        <span style="font-size: 0.9em; font-weight: 600;">
+          🏸 Player <span id="gamePlayerNumber">?</span>
+        </span>
+      </div>
+      
+      <div class="status-badge disconnected" id="connectionStatus">
+        Connecting...
+      </div>
+      
+      <div class="swing-indicator" id="swingIndicator">
+        <div class="power-value" id="powerValue">0</div>
+        <div class="power-label">READY</div>
+      </div>
+      
+      <div class="sensor-info" id="sensorInfo">
+        Speed: 0.0 m/s<br>
+        Angle: 0°<br>
+        Status: Waiting...
+      </div>
+      
+      <div style="margin-top: 20px; padding: 15px; background: rgba(248, 113, 113, 0.2); border-radius: 10px; border: 2px solid rgba(248, 113, 113, 0.5); text-align: center;">
+        <strong>⚠️ HOLD TIGHT!</strong><br>
+        Swing naturally, don't throw your phone!
+      </div>
+      
+      <button class="btn btn-secondary" onclick="leaveGameBtn()" style="margin-top: 20px; background: rgba(239, 68, 68, 0.3); border: 2px solid rgba(239, 68, 68, 0.5);">
+        🚪 Leave Game
+      </button>
+    </div>
+  </div>
+
+  <script src="controller.js"></script>
+</body>
+</html>

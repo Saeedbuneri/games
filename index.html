@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏸 Badminton Racket Game</title>
+  <meta http-equiv="refresh" content="0; url=start.html">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .loading {
+      text-align: center;
+      font-size: 2em;
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    🏸<br>
+    Loading Badminton Game...<br>
+    <div style="font-size: 0.5em; margin-top: 20px;">Redirecting to start page...</div>
+  </div>
+</body>
+</html>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      text-align: center;
+    }
+    
+    h1 {
+      font-size: 3em;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .subtitle {
+      font-size: 1.3em;
+      margin-bottom: 40px;
+      opacity: 0.9;
+    }
+    
+    .device-selector {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 40px;
+    }
+    
+    .device-card {
+      background: white;
+      color: #667eea;
+      border-radius: 20px;
+      padding: 40px 30px;
+      min-width: 250px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      transition: transform 0.3s, box-shadow 0.3s;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+    }
+    
+    .device-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+    }
+    
+    .device-icon {
+      font-size: 4em;
+      margin-bottom: 20px;
+    }
+    
+    .device-title {
+      font-size: 1.8em;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .device-desc {
+      font-size: 1em;
+      opacity: 0.7;
+      line-height: 1.5;
+    }
+    
+    .info-section {
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 30px;
+      margin-top: 50px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .info-section h2 {
+      font-size: 1.8em;
+      margin-bottom: 15px;
+    }
+    
+    .info-section p {
+      font-size: 1.1em;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+    
+    .warning {
+      background: rgba(248, 113, 113, 0.3);
+      border: 2px solid #f87171;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .warning strong {
+      font-size: 1.2em;
+    }
+    
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2em;
+      }
+      
+      .subtitle {
+        font-size: 1.1em;
+      }
+      
+      .device-card {
+        min-width: 200px;
+      }
+      
+      .device-title {
+        font-size: 1.5em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏸 Badminton Racket Game</h1>
+    <p class="subtitle">Turn your phone into a badminton racket using real sensors!</p>
+    
+    <div class="device-selector">
+      <a href="big-screen.html" class="device-card">
+        <div class="device-icon">🖥️</div>
+        <div class="device-title">Big Screen</div>
+        <div class="device-desc">Open this on your TV or computer to display the game court</div>
+      </a>
+      
+      <a href="phone-controller.html" class="device-card">
+        <div class="device-icon">📱</div>
+        <div class="device-title">Phone Controller</div>
+        <div class="device-desc">Open this on your smartphone to use it as a racket</div>
+      </a>
+    </div>
+    
+    <div class="info-section">
+      <h2>🎮 How to Play</h2>
+      <p><strong>1.</strong> Open "Big Screen" on your TV/computer</p>
+      <p><strong>2.</strong> Open "Phone Controller" on 2 smartphones</p>
+      <p><strong>3.</strong> Follow the calibration instructions on each phone</p>
+      <p><strong>4.</strong> Swing your phone like a real badminton racket!</p>
+      
+      <div class="warning">
+        <strong>⚠️ Safety Warning</strong><br>
+        Hold your phone tight! Use a wrist strap if available. Clear the area of breakable objects before playing!
+      </div>
+    </div>
+    
+    <div class="info-section" style="margin-top: 30px;">
+      <h2>⚙️ Setup Required</h2>
+      <p>Before playing, you need to configure your <strong>Ably API Key</strong> in <code>config.js</code></p>
+      <p>Get a free API key at <a href="https://ably.com" target="_blank" style="color: #4ade80;">ably.com</a></p>
+    </div>
+  </div>
+  
+  <script>
+    // Detect if mobile device and auto-redirect if appropriate
+    function isMobile() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+    
+    // Optional: Auto-redirect mobile devices to controller
+    // Uncomment if you want automatic redirection
+    /*
+    if (isMobile() && !window.location.search.includes('skip-redirect')) {
+      window.location.href = 'phone-controller.html';
+    }
+    */
+  </script>
+</body>
+</html>

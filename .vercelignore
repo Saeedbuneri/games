@@ -1,0 +1,7 @@
+node_modules/
+.git/
+*.md
+test.html
+env.example.js
+.vscode/
+.idea/

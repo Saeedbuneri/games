@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.npm
+
+# Environment variables (if you add any)
+.env
+.env.local
+.env.production
+env.js
+
+# Vercel
+.vercel
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+Thumbs.db
