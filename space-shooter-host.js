@@ -199,8 +199,8 @@ class SpaceShooterGame {
       left: {
         x: 100,
         y: this.canvas.height / 2,
-        width: 40,
-        height: 60,
+        width: 60,
+        height: 90,
         health: 100,
         score: 0,
         bullets: [],
@@ -216,8 +216,8 @@ class SpaceShooterGame {
       right: {
         x: this.canvas.width - 140,
         y: this.canvas.height / 2,
-        width: 40,
-        height: 60,
+        width: 60,
+        height: 90,
         health: 100,
         score: 0,
         bullets: [],
@@ -419,7 +419,7 @@ class SpaceShooterGame {
       y: player.y,
       vx: direction * 800,
       vy: 0,
-      radius: 5
+      radius: 8
     });
     
     // Create muzzle flash particles
@@ -821,10 +821,15 @@ function restartGame() {
   // Reset and start new game
   hostScreen.game = new SpaceShooterGame(hostScreen);
   
-  // Notify players
+  // Notify players that game is restarting and starting
   hostScreen.channel.publish('gameEvent', {
     type: 'restart'
   });
+  
+  // Send game started event so controllers know to stay connected
+  setTimeout(() => {
+    hostScreen.channel.publish('gameStarted', {});
+  }, 500);
 }
 
 function showQuitConfirm() {

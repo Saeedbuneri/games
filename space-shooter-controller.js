@@ -232,9 +232,17 @@ class SpaceShooterController {
         break;
         
       case 'restart':
+        // Remove game over overlay if it exists
+        const overlay = document.querySelector('.game-over-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+        
+        // Reset health and prepare for new game
         this.health = 100;
         this.updateHealth();
-        this.showNotification('🔄 Game Restarted');
+        this.gameStarted = false; // Will be set to true when gameStarted event fires
+        this.showNotification('🔄 Game Restarting...');
         break;
     }
   }
