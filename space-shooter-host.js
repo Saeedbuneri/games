@@ -389,25 +389,109 @@ class SpaceShooterGame {
     const bot = this.players[side];
     const opponent = this.players[side === 'left' ? 'right' : 'left'];
     
-    // Simple AI: Follow opponent's Y position and shoot
-    const targetY = opponent.y;
-    const diff = targetY - bot.y;
-    
-    if (Math.abs(diff) > 20) {
-      if (diff > 0) {
-        bot.moveDown = true;
-        bot.moveUp = false;
-      } else {
-        bot.moveUp = true;
-        bot.moveDown = false;
-      }
-    } else {
-      bot.moveUp = false;
-      bot.moveDown = false;
+    // Initialize bot AI state if not exists
+    if (!bot.aiState) {
+      bot.aiState = {
+        targetY: this.canvas.height / 2,
+        strategyTimer: 0,
+        strategy: 'aggressive',
+        dodgeTimer: 0,
+        lastShot: 0
+      };
     }
     
-    // Shoot with some randomness
-    bot.shooting = Math.random() > 0.3;
+    bot.aiState.strategyTimer += dt;
+    bot.aiState.dodgeTimer += dt;
+    
+    // Check for incoming bullets and dodge
+    let incomingBullet = null;
+    for (let bullet of opponent.bullets) {
+      const bulletDirection = side === 'left' ? -1 : 1;
+      if ((bulletDirection === -1 && bullet.x < bot.x + 200) || 
+          (bulletDirection === 1 && bullet.x > bot.x - 200)) {
+        // Bullet is coming towards bot
+        const distance = Math.abs(bullet.y - bot.y);
+        if (distance < 150) {
+          incomingBullet = bullet;
+          break;
+        }
+      }
+    }
+    
+    // Dodge incoming bullets
+    if (incomingBullet && bot.aiState.dodgeTimer > 0.3) {
+      const dodgeDirection = incomingBullet.y > bot.y ? -1 : 1;
+      if (dodgeDirection < 0) {
+        bot.moveUp = true;
+        bot.moveDown = false;
+      } else {
+        bot.moveDown = true;
+        bot.moveUp = false;
+      }
+      bot.aiState.dodgeTimer = 0;
+    } else {
+      // Change strategy every 3-5 seconds
+      if (bot.aiState.strategyTimer > 3 + Math.random() * 2) {
+        const strategies = ['aggressive', 'defensive', 'mirror'];
+        bot.aiState.strategy = strategies[Math.floor(Math.random() * strategies.length)];
+        bot.aiState.strategyTimer = 0;
+      }
+      
+      // Execute strategy
+      let targetY;
+      switch (bot.aiState.strategy) {
+        case 'aggressive':
+          // Try to align with opponent for direct shots
+          targetY = opponent.y + (Math.random() - 0.5) * 50;
+          break;
+        case 'defensive':
+          // Move to opposite side to avoid opponent
+          targetY = opponent.y > this.canvas.height / 2 ? 
+                    this.canvas.height * 0.3 : 
+                    this.canvas.height * 0.7;
+          break;
+        case 'mirror':
+          // Stay at middle height
+          targetY = this.canvas.height / 2 + (Math.random() - 0.5) * 100;
+          break;
+      }
+      
+      // Smooth movement towards target
+      const diff = targetY - bot.y;
+      const threshold = 30;
+      
+      if (Math.abs(diff) > threshold) {
+        if (diff > 0) {
+          bot.moveDown = true;
+          bot.moveUp = false;
+        } else {
+          bot.moveUp = true;
+          bot.moveDown = false;
+        }
+      } else {
+        bot.moveUp = false;
+        bot.moveDown = false;
+      }
+    }
+    
+    // Intelligent shooting - only shoot when aligned
+    const verticalAlignment = Math.abs(opponent.y - bot.y);
+    bot.aiState.lastShot += dt;
+    
+    if (bot.aiState.strategy === 'aggressive') {
+      // Aggressive: shoot frequently when roughly aligned
+      bot.shooting = verticalAlignment < 150 && bot.aiState.lastShot > 0.3;
+    } else if (bot.aiState.strategy === 'defensive') {
+      // Defensive: shoot less frequently, only when well aligned
+      bot.shooting = verticalAlignment < 80 && bot.aiState.lastShot > 0.5;
+    } else {
+      // Mirror: moderate shooting
+      bot.shooting = verticalAlignment < 100 && bot.aiState.lastShot > 0.4;
+    }
+    
+    if (bot.shooting) {
+      bot.aiState.lastShot = 0;
+    }
   }
   
   fireBullet(side) {
