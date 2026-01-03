@@ -36,6 +36,7 @@ class SpaceShooterHost {
       
       await this.connectToAbly();
       this.setupCanvas();
+      this.updateStartButton(); // Update button based on game mode
       console.log('Space Shooter host ready!');
     } catch (error) {
       console.error('Init error:', error);
