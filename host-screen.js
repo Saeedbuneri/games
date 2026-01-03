@@ -20,6 +20,7 @@ class HostScreen {
     try {
       // Load config from Vercel environment if deployed
       await CONFIG.loadFromEnvironment();
+      console.log('API Key after load:', CONFIG.ABLY_API_KEY ? 'Present' : 'Missing');
       
       // Create room
       const roomCode = this.roomManager.createRoom();

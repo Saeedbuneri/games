@@ -8,12 +8,17 @@ const CONFIG = {
   async loadFromEnvironment() {
     if (window.location.hostname.includes('vercel.app')) {
       try {
+        console.log('Loading config from /api/config...');
         const response = await fetch('/api/config');
+        if (!response.ok) {
+          throw new Error(`API responded with ${response.status}`);
+        }
         const data = await response.json();
         this.ABLY_API_KEY = data.ABLY_API_KEY || this.ABLY_API_KEY;
-        console.log('Loaded config from Vercel environment');
+        console.log('Loaded config from Vercel environment, key:', this.ABLY_API_KEY ? 'Present' : 'Missing');
       } catch (error) {
-        console.warn('Could not load config from API, using local env.js');
+        console.error('Could not load config from API:', error);
+        console.warn('Using local env.js fallback');
       }
     } else {
       console.log('Using local env.js configuration');
