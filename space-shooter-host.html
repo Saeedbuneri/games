@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🚀 Space Shooter - Host Screen</title>
-  <script src="env.js"></script>
+  <script src="env.js" onerror="console.log('env.js not found - will use Vercel config')"></script>
   <script src="config.js"></script>
   <script src="room-manager.js"></script>
   <script src="ably-client.js"></script>
@@ -407,16 +407,27 @@
       </div>
       
       <script>
-        // Set initial mode selection based on URL - must run immediately
-        (function() {
-          const urlParams = new URLSearchParams(window.location.search);
-          const mode = urlParams.get('mode');
-          if (mode === 'bot') {
-            document.getElementById('modeBot').classList.add('selected');
-          } else {
-            document.getElementById('modePvP').classList.add('selected');
+        // Set initial mode selection and define selectMode function
+        let selectedMode = (new URLSearchParams(window.location.search)).get('mode') === 'bot' ? 'bot' : 'pvp';
+        
+        // Apply initial selection immediately
+        if (selectedMode === 'bot') {
+          document.getElementById('modeBot').classList.add('selected');
+        } else {
+          document.getElementById('modePvP').classList.add('selected');
+        }
+        
+        // Define selectMode function globally
+        function selectMode(mode) {
+          selectedMode = mode;
+          document.getElementById('modePvP').classList.toggle('selected', mode === 'pvp');
+          document.getElementById('modeBot').classList.toggle('selected', mode === 'bot');
+          
+          if (typeof hostScreen !== 'undefined' && hostScreen) {
+            hostScreen.gameMode = mode;
+            hostScreen.updateStartButton();
           }
-        })();
+        }
       </script>
 
       <div style="margin: 20px 0;">
@@ -510,19 +521,7 @@
       }
     };
 
-    // Get mode from URL
-    let selectedMode = (new URLSearchParams(window.location.search)).get('mode') === 'bot' ? 'bot' : 'pvp';
-
-    function selectMode(mode) {
-      selectedMode = mode;
-      document.getElementById('modePvP').classList.toggle('selected', mode === 'pvp');
-      document.getElementById('modeBot').classList.toggle('selected', mode === 'bot');
-      
-      if (hostScreen) {
-        hostScreen.gameMode = mode;
-        hostScreen.updateStartButton();
-      }
-    }
+    // selectedMode and selectMode are now defined in the inline script above
 
     function backToMenu() {
       window.location.href = 'start.html';
