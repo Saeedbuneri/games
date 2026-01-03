@@ -7,7 +7,6 @@
   <script src="env.js" onerror="console.log('env.js not found - will use Vercel config')"></script>
   <script src="config.js"></script>
   <script src="room-manager.js"></script>
-  <script src="ably-client.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     * {
@@ -502,26 +501,7 @@
 
   <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
   <script>
-    // QR Code Generator
-    const QRCodeGenerator = {
-      generateCanvas: function(text, canvas, size) {
-        const qr = qrcode(0, 'M');
-        qr.addData(text);
-        qr.make();
-        const cellSize = Math.floor(size / qr.getModuleCount());
-        canvas.width = cellSize * qr.getModuleCount();
-        canvas.height = cellSize * qr.getModuleCount();
-        const ctx = canvas.getContext('2d');
-        for (let row = 0; row < qr.getModuleCount(); row++) {
-          for (let col = 0; col < qr.getModuleCount(); col++) {
-            ctx.fillStyle = qr.isDark(row, col) ? '#000' : '#fff';
-            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-          }
-        }
-      }
-    };
-
-    // selectedMode and selectMode are now defined in the inline script above
+    // selectedMode and selectMode are defined in the inline script above
 
     function backToMenu() {
       window.location.href = 'start.html';
