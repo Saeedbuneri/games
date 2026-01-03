@@ -393,7 +393,7 @@
       <div style="margin: 20px 0;">
         <div style="font-size: 0.9em; opacity: 0.7; margin-bottom: 15px;">GAME MODE</div>
         <div class="game-mode-selector">
-          <div class="mode-card selected" onclick="selectMode('pvp')" id="modePvP">
+          <div class="mode-card" onclick="selectMode('pvp')" id="modePvP">
             <div class="mode-icon">👥</div>
             <div style="font-weight: 600;">Player vs Player</div>
             <div style="font-size: 0.85em; opacity: 0.7; margin-top: 5px;">2 players required</div>
@@ -405,6 +405,19 @@
           </div>
         </div>
       </div>
+      
+      <script>
+        // Set initial mode selection based on URL - must run immediately
+        (function() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const mode = urlParams.get('mode');
+          if (mode === 'bot') {
+            document.getElementById('modeBot').classList.add('selected');
+          } else {
+            document.getElementById('modePvP').classList.add('selected');
+          }
+        })();
+      </script>
 
       <div style="margin: 20px 0;">
         <div style="font-size: 0.9em; opacity: 0.7; margin-bottom: 10px;">CONNECTED PLAYERS</div>
@@ -501,20 +514,6 @@
     const urlParams = new URLSearchParams(window.location.search);
     const modeParam = urlParams.get('mode');
     let selectedMode = modeParam === 'bot' ? 'bot' : 'pvp';
-
-    // Apply initial mode selection immediately
-    if (modeParam === 'bot') {
-      document.getElementById('modePvP').classList.remove('selected');
-      document.getElementById('modeBot').classList.add('selected');
-    }
-
-    // Ensure mode is set when hostScreen is ready
-    window.addEventListener('load', () => {
-      if (modeParam === 'bot' && hostScreen) {
-        hostScreen.gameMode = 'bot';
-        hostScreen.updateStartButton();
-      }
-    });
 
     function selectMode(mode) {
       selectedMode = mode;
