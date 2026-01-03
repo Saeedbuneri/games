@@ -1,8 +1,22 @@
 // Shared configuration for the Badminton Racket Game
 const CONFIG = {
-  // Ably configuration - API key loaded from env.js
-  ABLY_API_KEY: (typeof ENV !== 'undefined' && ENV.ABLY_API_KEY) || 'YOUR_ABLY_API_KEY_HERE',
+  // Ably configuration - Will be loaded from API in production
+  ABLY_API_KEY: (typeof ENV !== 'undefined' && ENV.ABLY_API_KEY) || '',
   ABLY_REST_URL: 'https://rest.ably.io',
+  
+  // Function to load config from Vercel environment
+  async loadFromEnvironment() {
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost') {
+      try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        this.ABLY_API_KEY = data.ABLY_API_KEY || this.ABLY_API_KEY;
+        console.log('Loaded config from Vercel environment');
+      } catch (error) {
+        console.warn('Could not load config from API, using local env.js');
+      }
+    }
+  },
   
   // Game room/channel - change this to create different game sessions
   GAME_CHANNEL: 'badminton-game-room-1',

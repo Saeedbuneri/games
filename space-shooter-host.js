@@ -22,6 +22,9 @@ class SpaceShooterHost {
   async init() {
     console.log('Space Shooter host initializing...');
     try {
+      // Load config from Vercel environment if deployed
+      await CONFIG.loadFromEnvironment();
+      
       const roomCode = this.roomManager.createRoom();
       console.log('Room created:', roomCode);
       document.getElementById('roomCode').textContent = roomCode;
