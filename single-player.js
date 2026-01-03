@@ -30,7 +30,7 @@ class SinglePlayerGame {
       
       // Generate QR code
       const baseUrl = window.location.origin + window.location.pathname.replace('single-player.html', '');
-      const joinUrl = baseUrl + 'controller.html?join=' + roomCode;
+      const joinUrl = baseUrl + 'controller-select.html?join=' + roomCode;
       QRCodeGenerator.generateCanvas(joinUrl, document.getElementById('qrCode'), 220);
       console.log('QR code generated for:', joinUrl);
       

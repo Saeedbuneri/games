@@ -31,7 +31,7 @@ class SpaceShooterHost {
       document.getElementById('gameRoomCode').textContent = roomCode;
       
       const baseUrl = window.location.origin + window.location.pathname.replace('space-shooter-host.html', '');
-      const joinUrl = baseUrl + 'space-shooter-controller.html?join=' + roomCode;
+      const joinUrl = baseUrl + 'controller-select.html?join=' + roomCode;
       console.log('Controller URL:', joinUrl);
       QRCodeGenerator.generateCanvas(joinUrl, document.getElementById('qrCode'), 220);
       

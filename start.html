@@ -336,7 +336,7 @@
           <div class="role-icon">🎮</div>
           <div class="role-content">
             <div class="role-title">Controller</div>
-            <div class="role-desc">Use phone as badminton racket</div>
+            <div class="role-desc">Use phone as game controller</div>
           </div>
         </button>
       </div>
@@ -492,18 +492,13 @@
       // Check if there's a join code in URL
       const urlParams = new URLSearchParams(window.location.search);
       const joinCode = urlParams.get('join');
-      const game = urlParams.get('game') || 'badminton'; // Default to badminton
       
       if (joinCode) {
-        // Redirect to appropriate controller based on game
-        if (game === 'space-shooter') {
-          window.location.href = 'space-shooter-controller.html?join=' + joinCode;
-        } else {
-          window.location.href = 'controller.html?join=' + joinCode;
-        }
+        // Redirect to controller selection with join code
+        window.location.href = 'controller-select.html?join=' + joinCode;
       } else {
-        // Show manual input screen - default to badminton controller
-        window.location.href = 'controller.html';
+        // Show controller selection to choose game
+        window.location.href = 'controller-select.html';
       }
     }
 

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🎮 Select Game Controller</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2em;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .subtitle {
+      text-align: center;
+      opacity: 0.9;
+      margin-bottom: 40px;
+      font-size: 1.1em;
+    }
+
+    .game-card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 20px;
+      border: 2px solid rgba(255,255,255,0.2);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .game-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.4);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .game-card:active {
+      transform: translateY(-2px);
+    }
+
+    .game-icon {
+      font-size: 3em;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .game-info {
+      flex: 1;
+    }
+
+    .game-title {
+      font-size: 1.5em;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .game-desc {
+      opacity: 0.9;
+      font-size: 0.95em;
+    }
+
+    .arrow {
+      font-size: 1.5em;
+      opacity: 0.6;
+    }
+
+    .back-button {
+      background: rgba(255,255,255,0.2);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 15px 30px;
+      border-radius: 15px;
+      font-size: 1.1em;
+      cursor: pointer;
+      margin-top: 20px;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+
+    .back-button:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.5em;
+      }
+
+      .game-card {
+        padding: 20px;
+      }
+
+      .game-icon {
+        font-size: 2.5em;
+        min-width: 60px;
+      }
+
+      .game-title {
+        font-size: 1.2em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Select Your Game</h1>
+    <p class="subtitle">Choose which game you want to join</p>
+
+    <div class="game-card" onclick="selectGame('space-shooter')">
+      <div class="game-icon">🚀</div>
+      <div class="game-info">
+        <div class="game-title">Space Shooter</div>
+        <div class="game-desc">Fast-paced arcade shooting action</div>
+      </div>
+      <div class="arrow">→</div>
+    </div>
+
+    <div class="game-card" onclick="selectGame('badminton')">
+      <div class="game-icon">🏸</div>
+      <div class="game-info">
+        <div class="game-title">Badminton</div>
+        <div class="game-desc">Motion-controlled racket sport</div>
+      </div>
+      <div class="arrow">→</div>
+    </div>
+
+    <button class="back-button" onclick="goHome()">← Back to Menu</button>
+  </div>
+
+  <script>
+    function selectGame(game) {
+      // Get room code from URL if present
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomCode = urlParams.get('join');
+      
+      if (game === 'space-shooter') {
+        if (roomCode) {
+          window.location.href = `space-shooter-controller.html?join=${roomCode}`;
+        } else {
+          window.location.href = 'space-shooter-controller.html';
+        }
+      } else if (game === 'badminton') {
+        if (roomCode) {
+          window.location.href = `controller.html?join=${roomCode}`;
+        } else {
+          window.location.href = 'controller.html';
+        }
+      }
+    }
+
+    function goHome() {
+      window.location.href = 'start.html';
+    }
+
+    // If there's a room code in URL, show it in the title
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('join');
+    if (roomCode) {
+      document.querySelector('.subtitle').textContent = `Room Code: ${roomCode} - Select your game`;
+    }
+  </script>
+</body>
+</html>
