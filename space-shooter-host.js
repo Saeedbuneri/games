@@ -197,10 +197,10 @@ class SpaceShooterGame {
     
     this.players = {
       left: {
-        x: 150,
+        x: 100,
         y: this.canvas.height / 2,
-        width: 80,
-        height: 120,
+        width: 40,
+        height: 60,
         health: 100,
         score: 0,
         bullets: [],
@@ -217,10 +217,10 @@ class SpaceShooterGame {
         hasPowerUp: false
       },
       right: {
-        x: this.canvas.width - 200,
+        x: this.canvas.width - 100,
         y: this.canvas.height / 2,
-        width: 80,
-        height: 120,
+        width: 40,
+        height: 60,
         health: 100,
         score: 0,
         bullets: [],
@@ -528,7 +528,7 @@ class SpaceShooterGame {
       y: player.y,
       vx: direction * 800,
       vy: 0,
-      radius: 12,
+      radius: 6,
       powerUp: player.hasPowerUp
     });
     
@@ -536,18 +536,18 @@ class SpaceShooterGame {
     if (player.hasPowerUp) {
       player.bullets.push({
         x: baseX,
-        y: player.y - 30,
+        y: player.y - 15,
         vx: direction * 800,
         vy: 0,
-        radius: 12,
+        radius: 6,
         powerUp: true
       });
       player.bullets.push({
         x: baseX,
-        y: player.y + 30,
+        y: player.y + 15,
         vx: direction * 800,
         vy: 0,
-        radius: 12,
+        radius: 6,
         powerUp: true
       });
     }
@@ -819,8 +819,8 @@ class SpaceShooterGame {
       ctx.scale(-1, 1);
     }
     
-    // Scale up for better visibility
-    ctx.scale(1.5, 1.5);
+    // Scale for 100% zoom (no upscaling)
+    ctx.scale(1, 1);
     
     // Rocket body
     ctx.fillStyle = player.color;
