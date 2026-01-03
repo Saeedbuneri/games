@@ -5,7 +5,12 @@ class SpaceShooterHost {
     this.ably = null;
     this.channel = null;
     this.players = new Map();
-    this.gameMode = 'pvp';
+    
+    // Check URL for initial game mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const modeParam = urlParams.get('mode');
+    this.gameMode = modeParam === 'bot' ? 'bot' : 'pvp';
+    
     this.game = null;
     this.canvas = null;
     this.ctx = null;

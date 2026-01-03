@@ -502,12 +502,17 @@
     const modeParam = urlParams.get('mode');
     let selectedMode = modeParam === 'bot' ? 'bot' : 'pvp';
 
-    // Auto-select bot mode if in URL
+    // Apply initial mode selection immediately
+    if (modeParam === 'bot') {
+      document.getElementById('modePvP').classList.remove('selected');
+      document.getElementById('modeBot').classList.add('selected');
+    }
+
+    // Ensure mode is set when hostScreen is ready
     window.addEventListener('load', () => {
-      if (modeParam === 'bot') {
-        setTimeout(() => {
-          selectMode('bot');
-        }, 500);
+      if (modeParam === 'bot' && hostScreen) {
+        hostScreen.gameMode = 'bot';
+        hostScreen.updateStartButton();
       }
     });
 
