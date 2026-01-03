@@ -242,7 +242,11 @@ class SpaceShooterGame {
     if (host.gameMode === 'bot') {
       if (!rightAssigned) {
         this.players.right.isBot = true;
-        this.players.right.name = 'AI Bot';
+        this.players.right.name = 'AI Bot 🤖';
+      }
+      if (!leftAssigned) {
+        this.players.left.isBot = true;
+        this.players.left.name = 'AI Bot 🤖';
       }
     }
     
@@ -302,6 +306,9 @@ class SpaceShooterGame {
     // Update bot AI
     if (this.players.right.isBot) {
       this.updateBot('right', dt);
+    }
+    if (this.players.left.isBot) {
+      this.updateBot('left', dt);
     }
     
     // Update player positions
