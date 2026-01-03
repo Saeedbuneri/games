@@ -341,6 +341,29 @@
         </button>
       </div>
       
+      <!-- Robot Game Selection -->
+      <div class="screen-select screen-type" id="robotSelect">
+        <h2 style="color: #1e293b; margin-bottom: 20px; text-align: center;">🤖 Select Game vs AI</h2>
+        
+        <button class="role-button" onclick="openGameWithBot('space-shooter')">
+          <div class="role-icon">🚀</div>
+          <div class="role-content">
+            <div class="role-title">Space Shooter vs AI</div>
+            <div class="role-desc">Battle against smart AI opponent</div>
+          </div>
+        </button>
+        
+        <button class="role-button" onclick="alert('Badminton bot mode coming soon! 🏸')" style="opacity: 0.6;">
+          <div class="role-icon">🏸</div>
+          <div class="role-content">
+            <div class="role-title">Badminton vs AI</div>
+            <div class="role-desc">Coming soon...</div>
+          </div>
+        </button>
+        
+        <button class="back-button" onclick="goBack()">← Back</button>
+      </div>
+
       <!-- Screen Type Selection -->
       <div class="screen-select screen-type" id="screenSelect">
         <h2 style="color: #1e293b; margin-bottom: 20px; text-align: center;">Select Game</h2>
@@ -447,8 +470,9 @@
       selectedRole = role;
       
       if (role === 'robot') {
-        // Single player mode - redirect to single player game
-        window.location.href = 'single-player.html';
+        // Show robot game selection
+        document.getElementById('roleSelector').style.display = 'none';
+        document.getElementById('robotSelect').classList.add('active');
       } else if (role === 'screen') {
         document.getElementById('roleSelector').style.display = 'none';
         document.getElementById('screenSelect').classList.add('active');
@@ -491,8 +515,17 @@
       }
     }
 
+    function openGameWithBot(game) {
+      if (game === 'space-shooter') {
+        window.location.href = 'space-shooter-host.html?mode=bot';
+      } else if (game === 'badminton') {
+        alert('Badminton bot mode coming soon! 🏸');
+      }
+    }
+
     function goBack() {
       document.getElementById('screenSelect').classList.remove('active');
+      document.getElementById('robotSelect').classList.remove('active');
       document.getElementById('roleSelector').style.display = 'flex';
       selectedRole = null;
     }
