@@ -123,6 +123,10 @@ class SpaceShooterController {
   async connectToRoom(roomCode) {
     try {
       console.log('Connecting to space shooter room:', roomCode);
+      
+      // Load config from Vercel environment if deployed
+      await CONFIG.loadFromEnvironment();
+      
       this.ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
       const channelName = `space-shooter-room-${roomCode}`;
       this.channel = this.ably.channels.get(channelName);
