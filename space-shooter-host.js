@@ -197,10 +197,10 @@ class SpaceShooterGame {
     
     this.players = {
       left: {
-        x: 100,
+        x: 150,
         y: this.canvas.height / 2,
-        width: 60,
-        height: 90,
+        width: 80,
+        height: 120,
         health: 100,
         score: 0,
         bullets: [],
@@ -211,13 +211,16 @@ class SpaceShooterGame {
         fireRate: 200,
         color: '#3b82f6',
         playerId: null,
-        isBot: false
+        isBot: false,
+        rotation: 0,
+        powerUpTimer: 0,
+        hasPowerUp: false
       },
       right: {
-        x: this.canvas.width - 140,
+        x: this.canvas.width - 200,
         y: this.canvas.height / 2,
-        width: 60,
-        height: 90,
+        width: 80,
+        height: 120,
         health: 100,
         score: 0,
         bullets: [],
@@ -228,7 +231,10 @@ class SpaceShooterGame {
         fireRate: 200,
         color: '#ef4444',
         playerId: null,
-        isBot: false
+        isBot: false,
+        rotation: 0,
+        powerUpTimer: 0,
+        hasPowerUp: false
       }
     };
     
@@ -326,14 +332,31 @@ class SpaceShooterGame {
       const player = this.players[side];
       
       if (player.moveUp) {
-        player.y -= 300 * dt;
-      }
-      if (player.moveDown) {
-        player.y += 300 * dt;
+        player.y -= 400 * dt;
+        player.rotation = -0.15; // Tilt up
+      } else if (player.moveDown) {
+        player.y += 400 * dt;
+        player.rotation = 0.15; // Tilt down
+      } else {
+        player.rotation = 0; // Level
       }
       
       // Keep in bounds
       player.y = Math.max(player.height / 2, Math.min(this.canvas.height - player.height / 2, player.y));
+      
+      // Update power-up timer (boost every 15 seconds for 5 seconds)
+      player.powerUpTimer += dt;
+      if (player.powerUpTimer >= 15 && player.powerUpTimer < 20) {
+        if (!player.hasPowerUp) {
+          player.hasPowerUp = true;
+          player.fireRate = 100; // Faster shooting
+          this.showGameEvent(`${side.toUpperCase()} BOOST ACTIVATED! 🚀`);
+        }
+      } else if (player.powerUpTimer >= 20) {
+        player.hasPowerUp = false;
+        player.fireRate = 200; // Normal shooting
+        player.powerUpTimer = 0;
+      }
       
       // Auto-shoot
       if (player.shooting) {
@@ -497,14 +520,37 @@ class SpaceShooterGame {
   fireBullet(side) {
     const player = this.players[side];
     const direction = side === 'left' ? 1 : -1;
+    const baseX = player.x + (direction > 0 ? player.width / 2 : -player.width / 2);
     
+    // Normal shot
     player.bullets.push({
-      x: player.x + (direction > 0 ? player.width / 2 : -player.width / 2),
+      x: baseX,
       y: player.y,
       vx: direction * 800,
       vy: 0,
-      radius: 8
+      radius: 12,
+      powerUp: player.hasPowerUp
     });
+    
+    // Power-up: triple shot
+    if (player.hasPowerUp) {
+      player.bullets.push({
+        x: baseX,
+        y: player.y - 30,
+        vx: direction * 800,
+        vy: 0,
+        radius: 12,
+        powerUp: true
+      });
+      player.bullets.push({
+        x: baseX,
+        y: player.y + 30,
+        vx: direction * 800,
+        vy: 0,
+        radius: 12,
+        powerUp: true
+      });
+    }
     
     // Create muzzle flash particles
     for (let i = 0; i < 5; i++) {
@@ -697,14 +743,41 @@ class SpaceShooterGame {
     // Draw players
     ['left', 'right'].forEach(side => {
       const player = this.players[side];
+      
+      // Draw power-up glow
+      if (player.hasPowerUp) {
+        ctx.save();
+        ctx.shadowColor = player.color;
+        ctx.shadowBlur = 30;
+        ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.3;
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.width, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      
       this.drawRocket(ctx, player, side);
       
       // Draw bullets
-      ctx.fillStyle = player.color;
       player.bullets.forEach(bullet => {
+        // Power-up bullets glow
+        if (bullet.powerUp) {
+          ctx.save();
+          ctx.shadowColor = player.color;
+          ctx.shadowBlur = 20;
+          ctx.fillStyle = player.color;
+        } else {
+          ctx.fillStyle = player.color;
+        }
+        
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
         ctx.fill();
+        
+        if (bullet.powerUp) {
+          ctx.restore();
+        }
         
         // Bullet trail
         ctx.globalAlpha = 0.3;
@@ -740,10 +813,14 @@ class SpaceShooterGame {
   drawRocket(ctx, player, side) {
     ctx.save();
     ctx.translate(player.x, player.y);
+    ctx.rotate(player.rotation); // Add rotation animation
     
     if (side === 'right') {
       ctx.scale(-1, 1);
     }
+    
+    // Scale up for better visibility
+    ctx.scale(1.5, 1.5);
     
     // Rocket body
     ctx.fillStyle = player.color;
