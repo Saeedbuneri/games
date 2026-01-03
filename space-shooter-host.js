@@ -32,6 +32,7 @@ class SpaceShooterHost {
       
       const baseUrl = window.location.origin + window.location.pathname.replace('space-shooter-host.html', '');
       const joinUrl = baseUrl + 'space-shooter-controller.html?join=' + roomCode;
+      console.log('Controller URL:', joinUrl);
       QRCodeGenerator.generateCanvas(joinUrl, document.getElementById('qrCode'), 220);
       
       await this.connectToAbly();
