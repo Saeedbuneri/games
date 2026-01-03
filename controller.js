@@ -118,6 +118,10 @@ class Controller {
   async connectToRoom(roomCode) {
     try {
       console.log('Connecting to room:', roomCode);
+      
+      // Load config from Vercel environment if deployed
+      await CONFIG.loadFromEnvironment();
+      
       this.ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
       const channelName = `badminton-room-${roomCode}`;
       this.channel = this.ably.channels.get(channelName);

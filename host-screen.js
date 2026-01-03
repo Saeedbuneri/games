@@ -18,6 +18,9 @@ class HostScreen {
   async init() {
     console.log('Host screen initializing...');
     try {
+      // Load config from Vercel environment if deployed
+      await CONFIG.loadFromEnvironment();
+      
       // Create room
       const roomCode = this.roomManager.createRoom();
       console.log('Room created:', roomCode);

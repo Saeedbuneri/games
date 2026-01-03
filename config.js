@@ -6,7 +6,7 @@ const CONFIG = {
   
   // Function to load config from Vercel environment
   async loadFromEnvironment() {
-    if (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost') {
+    if (window.location.hostname.includes('vercel.app')) {
       try {
         const response = await fetch('/api/config');
         const data = await response.json();
@@ -15,6 +15,8 @@ const CONFIG = {
       } catch (error) {
         console.warn('Could not load config from API, using local env.js');
       }
+    } else {
+      console.log('Using local env.js configuration');
     }
   },
   

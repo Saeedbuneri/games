@@ -20,6 +20,9 @@ class SinglePlayerGame {
   async init() {
     console.log('Single player game initializing...');
     try {
+      // Load config from Vercel environment if deployed
+      await CONFIG.loadFromEnvironment();
+      
       // Create room for the human player's controller
       const roomCode = this.roomManager.createRoom();
       console.log('Room created:', roomCode);
