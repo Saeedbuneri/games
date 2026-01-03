@@ -510,10 +510,8 @@
       }
     };
 
-    // Check URL for bot mode
-    const urlParams = new URLSearchParams(window.location.search);
-    const modeParam = urlParams.get('mode');
-    let selectedMode = modeParam === 'bot' ? 'bot' : 'pvp';
+    // Get mode from URL
+    let selectedMode = (new URLSearchParams(window.location.search)).get('mode') === 'bot' ? 'bot' : 'pvp';
 
     function selectMode(mode) {
       selectedMode = mode;
