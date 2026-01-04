@@ -37,10 +37,13 @@ class GunFightController {
       const input = document.getElementById('roomCodeInput');
       input.value = joinCode.toUpperCase();
       
-      // Show notification
+      // Auto-join after brief delay
       setTimeout(() => {
-        this.showNotification(`🔫 Ready to join battle ${joinCode}!`);
+        console.log('Auto-joining room:', joinCode);
+        this.joinGame(joinCode.toUpperCase());
       }, 500);
+      
+      return; // Skip setting up manual join button handlers during auto-join
     }
     
     // Auto-uppercase room code input
