@@ -189,15 +189,23 @@ class GunFightHost {
     const speed = player.isCrouching ? 3 : 6;
     const deadzone = 0.15; // Ignore small joystick movements
     
-    // Check if input is above deadzone
+    // Check if joystick is not active or input is too small
+    if (!data.active) {
+      // Stop immediately when joystick is not being touched
+      player.vx = 0;
+      player.vy = 0;
+      return;
+    }
+    
+    // Check if input magnitude is above deadzone
     const magnitude = Math.sqrt(data.x * data.x + data.y * data.y);
     
-    if (magnitude < deadzone || !data.active) {
-      // Stop immediately when joystick is released or in deadzone
+    if (magnitude < deadzone) {
+      // Stop when in deadzone
       player.vx = 0;
       player.vy = 0;
     } else {
-      // Move only when joystick is actively pushed
+      // Move only when joystick is actively pushed beyond deadzone
       player.vx = data.x * speed;
       player.vy = data.y * speed;
     }

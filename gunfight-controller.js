@@ -239,10 +239,12 @@ class GunFightController {
     
     const maxDistance = 35; // Maximum distance from center (adjusted for smaller joystick)
     let startX, startY, centerX, centerY;
+    let isActive = false;
     
     const handleStart = (e) => {
       e.preventDefault();
       
+      isActive = true;
       const touch = e.touches ? e.touches[0] : e;
       const rect = container.getBoundingClientRect();
       
@@ -258,6 +260,8 @@ class GunFightController {
     
     const handleMove = (e) => {
       e.preventDefault();
+      
+      if (!isActive) return;
       
       const touch = e.touches ? e.touches[0] : e;
       const touchId = e.touches ? e.touches[0].identifier : 'mouse';
@@ -304,6 +308,7 @@ class GunFightController {
     const handleEnd = (e) => {
       e.preventDefault();
       
+      isActive = false;
       const touchId = e.changedTouches ? e.changedTouches[0].identifier : 'mouse';
       
       // Only handle if this touch was on this joystick
