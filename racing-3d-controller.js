@@ -98,6 +98,13 @@ class Racing3DController {
         this.handleRaceEnded(message.data);
       });
       
+      this.channel.subscribe('lapUpdate', (message) => {
+        if (message.data.playerId === this.playerId) {
+          this.currentLap = message.data.lap;
+          document.getElementById('currentLapDisplay').textContent = this.currentLap;
+        }
+      });
+      
     } catch (error) {
       console.error('Connection error:', error);
     }
