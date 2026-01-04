@@ -123,6 +123,7 @@ class GunFightHost {
   
   handlePlayerJoined(data) {
     const { playerId } = data;
+    console.log('Player joining:', playerId, data);
     
     if (!this.players.has(playerId)) {
       const player = {
@@ -149,12 +150,16 @@ class GunFightHost {
       };
       
       this.players.set(playerId, player);
+      console.log('Player added to map. Total players:', this.players.size);
       this.updatePlayerList();
       
       // Enable start button if we have players
       if (this.players.size > 0) {
-        document.getElementById('startGameBtn').disabled = false;
+        const startBtn = document.getElementById('startGameBtn');
+        if (startBtn) startBtn.disabled = false;
       }
+    } else {
+      console.log('Player already in game:', playerId);
     }
   }
   
@@ -424,11 +429,8 @@ class GunFightHost {
   
   updatePlayerList() {
     const playerList = document.getElementById('playerList');
-    const playerCount = document.getElementById('playerCount');
     
-    playerCount.textContent = this.players.size;
-    
-    let html = '<h3>Players Connected: ' + this.players.size + '</h3>';
+    let html = `<h3>Players Connected: <span id="playerCount">${this.players.size}</span></h3>`;
     
     for (const [id, player] of this.players) {
       html += `

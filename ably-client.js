@@ -7,10 +7,12 @@ class AblyRestClient {
     this.connectionListeners = [];
     this.clientId = 'client-' + Math.random().toString(36).substr(2, 9);
     this.isConnected = false;
-    this.eventSource = null;
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.pollingInterval = null;
+    this.subscribers = new Map(); // key: "channel:event", value: [callbacks]
+    this.connectionListeners = [];
+    this.pollingChannels = new Set();
+    this.pollingIntervals = new Map(); // channelName -> intervalId
+    this.lastMessageTimes = new Map(); // channelName -> timestamp
+    this.processedMessageIds = new Set();
     console.log('AblyRestClient initialized with key:', apiKey ? '✓ Present' : '✗ Missing');
   }
 
@@ -28,6 +30,10 @@ class AblyRestClient {
   connection = {
     on: (event, callback) => {
       this.connectionListeners.push({ event, callback });
+      // If already connected and listening for 'connected', trigger immediately
+      if (event === 'connected' && this.isConnected) {
+        setTimeout(() => callback(), 0);
+      }
     }
   };
 
@@ -70,30 +76,32 @@ class AblyRestClient {
     
     this.subscribers.get(key).push(callback);
 
-    // Start polling if not already started
-    if (!this.pollingInterval) {
+    // Start polling for this channel if not already started
+    if (!this.pollingChannels.has(channelName)) {
       console.log('Starting polling for channel:', channelName);
       this.startPolling(channelName);
     }
     
-    // Trigger connected event immediately after first subscription
+    // Trigger connected event if not already marked as connected
     if (!this.isConnected) {
-      setTimeout(() => {
-        this.isConnected = true;
-        console.log('Connection established');
-        this.notifyConnectionListeners('connected');
-      }, 100);
+      this.isConnected = true;
+      console.log('Connection established');
+      this.notifyConnectionListeners('connected');
     }
   }
 
   // Polling method for receiving messages (more reliable than SSE with REST API)
   startPolling(channelName) {
-    let lastMessageTime = Date.now();
+    if (this.pollingChannels.has(channelName)) return;
+    this.pollingChannels.add(channelName);
+    
+    // Initialize last message time to slightly before now to catch very recent messages
+    this.lastMessageTimes.set(channelName, Date.now() - 1000);
     
     const poll = async () => {
       try {
-        // Get recent messages
-        const url = `${this.baseUrl}/channels/${encodeURIComponent(channelName)}/messages?limit=10&direction=forwards&start=${lastMessageTime}`;
+        const lastTime = this.lastMessageTimes.get(channelName);
+        const url = `${this.baseUrl}/channels/${encodeURIComponent(channelName)}/messages?limit=20&direction=forwards&start=${lastTime}`;
         
         const response = await fetch(url, {
           headers: {
@@ -106,13 +114,32 @@ class AblyRestClient {
           
           // Process new messages
           if (messages && messages.length > 0) {
+            // Sort by timestamp to ensure correct order
+            messages.sort((a, b) => a.timestamp - b.timestamp);
+            
             messages.forEach(message => {
-              this.handleMessage(message);
+              // Skip if we've already processed this specific message ID
+              if (this.processedMessageIds.has(message.id)) return;
+              
+              // Skip if it's older than our last processed time (safety check)
+              if (message.timestamp < lastTime) return;
+              
+              this.handleMessage(channelName, message);
+              
+              // Mark as processed
+              this.processedMessageIds.add(message.id);
+              
               // Update last message time
               if (message.timestamp) {
-                lastMessageTime = message.timestamp + 1;
+                this.lastMessageTimes.set(channelName, message.timestamp);
               }
             });
+
+            // Keep processed IDs set size manageable
+            if (this.processedMessageIds.size > 200) {
+              const idsArray = Array.from(this.processedMessageIds);
+              this.processedMessageIds = new Set(idsArray.slice(-100));
+            }
           }
           
           if (!this.isConnected) {
@@ -121,30 +148,20 @@ class AblyRestClient {
           }
         }
       } catch (error) {
-        console.error('Polling error:', error);
-        if (this.isConnected) {
-          this.isConnected = false;
-          this.notifyConnectionListeners('disconnected');
-        }
+        console.error(`Polling error for ${channelName}:`, error);
       }
     };
 
-    // Poll every 300ms for good balance of responsiveness and performance
-    this.pollingInterval = setInterval(poll, 300);
+    // Poll every 400ms for good balance of responsiveness and performance
+    const intervalId = setInterval(poll, 400);
+    this.pollingIntervals.set(channelName, intervalId);
     
     // Initial poll
     poll();
-    
-    // Mark as connected immediately
-    setTimeout(() => {
-      this.isConnected = true;
-      this.notifyConnectionListeners('connected');
-    }, 100);
   }
 
   // Handle incoming messages
-  handleMessage(message) {
-    console.log('Message received:', message);
+  handleMessage(channelName, message) {
     const eventName = message.name;
     
     // Parse data if it's a string
@@ -153,41 +170,48 @@ class AblyRestClient {
       try {
         data = JSON.parse(data);
       } catch (e) {
-        console.warn('Failed to parse message data:', data);
+        // Not JSON, keep as string
       }
     }
     
-    // Find subscribers for this event
-    this.subscribers.forEach((callbacks, key) => {
-      const [channel, event] = key.split(':');
-      if (event === eventName) {
-        console.log('Calling callbacks for event:', eventName, 'with data:', data);
-        callbacks.forEach(callback => {
+    // Find subscribers for this specific channel and event
+    const key = `${channelName}:${eventName}`;
+    const callbacks = this.subscribers.get(key);
+    
+    if (callbacks) {
+      console.log(`[${channelName}] Event: ${eventName}`, data);
+      callbacks.forEach(callback => {
+        try {
           callback({
             data: data,
             name: eventName,
             timestamp: message.timestamp || Date.now()
           });
-        });
-      }
-    });
+        } catch (err) {
+          console.error('Error in subscriber callback:', err);
+        }
+      });
+    }
   }
 
   // Notify connection state listeners
   notifyConnectionListeners(state) {
     this.connectionListeners.forEach(listener => {
       if (listener.event === state) {
-        listener.callback();
+        try {
+          listener.callback();
+        } catch (err) {
+          console.error('Error in connection listener:', err);
+        }
       }
     });
   }
 
   // Close connection
   close() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-    }
+    this.pollingIntervals.forEach(intervalId => clearInterval(intervalId));
+    this.pollingIntervals.clear();
+    this.pollingChannels.clear();
     this.isConnected = false;
   }
 }
