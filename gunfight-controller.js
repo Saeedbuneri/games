@@ -60,9 +60,6 @@ class GunFightController {
         alert('Please enter a 4-letter room code');
       }
     });
-    
-    // Setup controls after connection
-    this.setupControllers();
   }
   
   async joinGame(code) {
@@ -125,6 +122,9 @@ class GunFightController {
     // Switch to controller screen
     document.getElementById('waitingScreen').classList.remove('active');
     document.getElementById('controllerScreen').classList.add('active');
+    
+    // Setup controls NOW that the screen is visible
+    this.setupControllers();
     
     // Vibrate on game start
     if (navigator.vibrate) {
