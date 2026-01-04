@@ -182,6 +182,15 @@
       <div class="arrow">→</div>
     </div>
 
+    <div class="game-card" onclick="selectGame('ping-pong')">
+      <div class="game-icon">🏓</div>
+      <div class="game-info">
+        <div class="game-title">Ping Pong</div>
+        <div class="game-desc">Classic table tennis with vertical slider controls</div>
+      </div>
+      <div class="arrow">→</div>
+    </div>
+
     <button class="back-button" onclick="goHome()">← Back to Menu</button>
   </div>
 
@@ -220,6 +229,12 @@
           window.location.href = `gunfight-controller.html?join=${roomCode}`;
         } else {
           window.location.href = 'gunfight-controller.html';
+        }
+      } else if (game === 'ping-pong') {
+        if (roomCode) {
+          window.location.href = `ping-pong-controller.html?join=${roomCode}`;
+        } else {
+          window.location.href = 'ping-pong-controller.html';
         }
       }
     }
