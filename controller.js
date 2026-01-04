@@ -28,9 +28,10 @@ class Controller {
       gyro: { alpha: 0, beta: 0, gamma: 0 }
     };
     
+    // Initialize previous acceleration for spike detection
     this.previousAccel = { x: 0, y: 0, z: 0 };
     this.lastSwingTime = 0;
-    this.swingCooldown = 500;
+    this.swingCooldown = 500; // ms between swings
     
     this.init();
     this.setupDisconnectHandler();
@@ -417,8 +418,9 @@ class Controller {
   
   sendSwing(speed) {
     let swingType = 'normal';
-    if (speed > 15) swingType = 'smash';
-    else if (speed < 5) swingType = 'drop';
+    if (speed > 16) swingType = 'smash';
+    else if (speed > 12) swingType = 'normal';
+    else swingType = 'drop';
     
     const angle = this.calculateSwingAngle();
     
@@ -435,12 +437,14 @@ class Controller {
   }
   
   calculateSwingAngle() {
-    const beta = this.smoothed.gyro.beta;
-    const gamma = this.smoothed.gyro.gamma;
+    // Use raw sensor values for angle, not baseline-subtracted
+    const beta = this.sensors.gyroscope.beta;
+    const gamma = this.sensors.gyroscope.gamma;
     
-    if (Math.abs(beta) > 45) {
+    // More sensitive angle detection
+    if (Math.abs(beta) > 30) {
       return beta > 0 ? 'overhead' : 'underhand';
-    } else if (Math.abs(gamma) > 30) {
+    } else if (Math.abs(gamma) > 20) {
       return gamma > 0 ? 'forehand' : 'backhand';
     }
     return 'neutral';
@@ -461,15 +465,17 @@ class Controller {
     
     const angle = Math.round(this.smoothed.gyro.gamma);
     
+    // Match detection thresholds to prevent constant "HIT" display
     let type = 'READY';
-    if (speed > 15) type = 'SMASH!';
-    else if (speed > 5) type = 'HIT';
-    else if (speed > 3) type = 'DROP';
+    if (speed > 16) type = 'SMASH!';
+    else if (speed > 12) type = 'STRONG';
+    else if (speed > 8) type = 'SWING';
+    else if (speed > 4) type = 'READY';
     
     document.getElementById('powerValue').textContent = Math.round(speed);
     document.querySelector('.power-label').textContent = type;
     document.getElementById('sensorInfo').innerHTML = `
-      Speed: ${speed.toFixed(1)} m/s<br>
+      Speed: ${speed.toFixed(1)}<br>
       Angle: ${angle}°<br>
       Status: ${type}
     `;
