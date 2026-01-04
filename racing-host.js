@@ -159,7 +159,7 @@ class RacingGame {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     
-    this.raceDistance = 3000; // Distance to finish line
+    this.raceDistance = 1500; // Distance to finish line
     this.racers = [];
     this.raceStartTime = 0;
     this.raceActive = false;
