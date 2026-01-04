@@ -34,12 +34,15 @@ class SpaceShooterHost {
       const joinUrl = baseUrl + 'controller-select.html?join=' + roomCode;
       console.log('Controller URL:', joinUrl);
       
-      try {
-        QRCodeGenerator.generateCanvas(joinUrl, document.getElementById('qrCode'), 220);
-      } catch (qrError) {
-        console.error('QR Code generation error:', qrError);
-        document.getElementById('qrCode').innerHTML = '<p style="color: #ef4444;">QR Code Error</p><p style="font-size: 0.9em;">Join manually with room code</p>';
-      }
+      const qrContainer = document.getElementById('qrCode');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: joinUrl,
+        width: 220,
+        height: 220,
+        colorDark: '#000000',
+        colorLight: '#ffffff'
+      });
       
       await this.connectToAbly();
       this.setupCanvas();

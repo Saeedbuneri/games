@@ -22,7 +22,15 @@ class Racing3DHost {
       
       const baseUrl = window.location.origin + window.location.pathname.replace('racing-3d-host.html', '');
       const joinUrl = baseUrl + 'controller-select.html?join=' + roomCode;
-      QRCodeGenerator.generateCanvas(joinUrl, document.getElementById('qrCode'), 200);
+      const qrContainer = document.getElementById('qrCode');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: joinUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#000000',
+        colorLight: '#ffffff'
+      });
       
       await this.connectToAbly();
       console.log('3D Racing host ready!');
