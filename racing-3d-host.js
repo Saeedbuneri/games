@@ -497,11 +497,12 @@ class Racing3DGame {
         Math.cos(racer.angle) * racer.laneRadius
       );
       
-      // Rotate car to face direction of movement
-      racer.mesh.rotation.y = -racer.angle;
+      // Rotate car to face tangent direction (perpendicular to radius)
+      // Add PI/2 to make car face forward along the circle
+      racer.mesh.rotation.y = -racer.angle + Math.PI / 2;
       
-      // Slight tilt when moving fast
-      racer.mesh.rotation.z = -Math.sin(racer.angle) * (racer.speed / 100);
+      // Slight banking when moving fast
+      racer.mesh.rotation.z = Math.min(racer.speed / 20, 0.2);
     });
     
     this.updateLeaderboard();

@@ -178,6 +178,21 @@ class Racing3DController {
     
     this.updateSpeedDisplay();
     this.setupControls();
+    
+    // Speed decay interval and send updates to host
+    this.controlInterval = setInterval(() => {
+      if (this.raceActive && !this.finished) {
+        // Natural speed decay
+        this.speed = Math.max(0, this.speed * 0.96);
+        this.updateSpeedDisplay();
+        
+        // Send speed update to host
+        this.channel.publish('racerControl', {
+          playerId: this.playerId,
+          speed: this.speed
+        });
+      }
+    }, 100);
   }
   
   handleTap() {
@@ -205,7 +220,7 @@ class Racing3DController {
     document.getElementById('tapCount').textContent = `Taps: ${this.tapCount}`;
     this.updateSpeedDisplay();
     
-    // Send speed to host
+    // Send speed to host immediately on tap
     this.channel.publish('racerControl', {
       playerId: this.playerId,
       speed: this.speed
@@ -216,27 +231,6 @@ class Racing3DController {
     const speedKmh = Math.round(this.speed * 100);
     document.getElementById('speedDisplay').textContent = `${speedKmh} km/h`;
     document.getElementById('speedBar').style.width = `${Math.min(this.speed / 3 * 100, 100)}%`;
-  }
-  
-  startRace() {
-    this.raceActive = true;
-    this.tapCount = 0;
-    this.speed = 0;
-    
-    document.getElementById('raceCountdown').style.display = 'none';
-    document.getElementById('tapSection').style.display = 'block';
-    document.getElementById('tapButton').classList.remove('disabled');
-    
-    this.updateSpeedDisplay();
-    
-    // Speed decay interval
-    this.controlInterval = setInterval(() => {
-      if (this.raceActive && !this.finished) {
-        // Natural speed decay
-        this.speed = Math.max(0, this.speed * 0.96);
-        this.updateSpeedDisplay();
-      }
-    }, 100);
   }
   
   handleRacerFinished(data) {
