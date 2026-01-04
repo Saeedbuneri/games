@@ -35,6 +35,9 @@ class GunFightHost {
   }
   
   async init() {
+    // Load config from Vercel environment if deployed
+    await CONFIG.loadFromEnvironment();
+    
     // Setup canvas
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
@@ -63,8 +66,7 @@ class GunFightHost {
   
   async setupAbly() {
     try {
-      const config = window.GAME_CONFIG;
-      this.ably = new Ably.Realtime(config.ABLY_API_KEY);
+      this.ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
       
       this.ably.connection.on('connected', () => {
         console.log('Host connected to Ably');
