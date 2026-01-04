@@ -11,8 +11,8 @@ class GunFightController {
     
     // Player state
     this.health = 100;
-    this.ammo = 60;
-    this.maxAmmo = 240;
+    this.ammo = 100;
+    this.maxAmmo = 500;
     this.score = 0;
     this.currentWeapon = 'primary';
     this.isCrouching = false;
@@ -187,6 +187,17 @@ class GunFightController {
     this.setupJoystick('lookJoystick', 'lookStick', (data) => {
       this.lookJoystick = data;
       this.sendLook();
+      
+      // Fire when aiming towards the boundary (magnitude > 0.8)
+      const magnitude = Math.sqrt(data.x * data.x + data.y * data.y);
+      const lookContainer = document.getElementById('lookJoystick');
+      
+      if (magnitude > 0.8 && this.gameStarted) {
+        this.fire();
+        lookContainer.classList.add('firing');
+      } else {
+        lookContainer.classList.remove('firing');
+      }
     });
     
     // Fire Button

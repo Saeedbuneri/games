@@ -208,6 +208,12 @@
       touch-action: none;
     }
 
+    .look-joystick-container.firing {
+      background: rgba(255,0,0,0.3);
+      border-color: rgba(255,0,0,0.8);
+      box-shadow: 0 0 20px rgba(255,0,0,0.4);
+    }
+
     .look-joystick-stick {
       position: absolute;
       width: 50px;
@@ -565,8 +571,8 @@
         </div>
       </div>
 
-      <!-- Fire Button -->
-      <div class="fire-button" id="fireButton">
+      <!-- Fire Button (Integrated into Aim Joystick) -->
+      <div class="fire-button" id="fireButton" style="display: none;">
         🔥
       </div>
 

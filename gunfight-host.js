@@ -28,9 +28,9 @@ class GunFightHost {
     
     // Weapons
     this.weapons = {
-      primary: { name: 'Assault Rifle', damage: 25, fireRate: 75, range: 500, ammo: 60, maxAmmo: 240 },
-      secondary: { name: 'Pistol', damage: 35, fireRate: 150, range: 300, ammo: 30, maxAmmo: 150 },
-      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 600, range: 1000, ammo: 10, maxAmmo: 50 }
+      primary: { name: 'Assault Rifle', damage: 25, fireRate: 75, range: 500, ammo: 100, maxAmmo: 500 },
+      secondary: { name: 'Pistol', damage: 35, fireRate: 150, range: 300, ammo: 50, maxAmmo: 250 },
+      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 600, range: 1000, ammo: 20, maxAmmo: 100 }
     };
     
     this.init();
