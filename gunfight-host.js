@@ -28,9 +28,9 @@ class GunFightHost {
     
     // Weapons
     this.weapons = {
-      primary: { name: 'Assault Rifle', damage: 25, fireRate: 100, range: 500, ammo: 60, maxAmmo: 240 },
-      secondary: { name: 'Pistol', damage: 35, fireRate: 200, range: 300, ammo: 30, maxAmmo: 150 },
-      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 800, range: 1000, ammo: 10, maxAmmo: 50 }
+      primary: { name: 'Assault Rifle', damage: 25, fireRate: 75, range: 500, ammo: 60, maxAmmo: 240 },
+      secondary: { name: 'Pistol', damage: 35, fireRate: 150, range: 300, ammo: 30, maxAmmo: 150 },
+      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 600, range: 1000, ammo: 10, maxAmmo: 50 }
     };
     
     this.init();
@@ -194,7 +194,7 @@ class GunFightHost {
   
   handleMove(player, data) {
     const speed = player.isCrouching ? 3 : 6;
-    const deadzone = 0.15; // Ignore small joystick movements
+    const deadzone = 0.2; // Increased deadzone for better control
     
     // Check if joystick is not active or input is too small
     if (!data.active) {
@@ -212,9 +212,16 @@ class GunFightHost {
       player.vx = 0;
       player.vy = 0;
     } else {
-      // Move only when joystick is actively pushed beyond deadzone
-      player.vx = data.x * speed;
-      player.vy = data.y * speed;
+      // Apply a curve to make small movements more precise (less sensitive)
+      // We normalize the magnitude above the deadzone and then apply a power
+      const normalizedMag = (magnitude - deadzone) / (1 - deadzone);
+      const curvedMag = Math.pow(normalizedMag, 1.5); // 1.5 power curve for better feel
+      
+      const dirX = data.x / magnitude;
+      const dirY = data.y / magnitude;
+      
+      player.vx = dirX * curvedMag * speed;
+      player.vy = dirY * curvedMag * speed;
     }
   }
   
