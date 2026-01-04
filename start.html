@@ -384,6 +384,14 @@
           </div>
         </button>
         
+        <button class="role-button" onclick="openGame('racing')">
+          <div class="role-icon">🏎️</div>
+          <div class="role-content">
+            <div class="role-title">Turbo Racer</div>
+            <div class="role-desc">Button-smashing racing action</div>
+          </div>
+        </button>
+        
         <button class="back-button" onclick="goBack()">← Back</button>
       </div>
       
@@ -507,6 +515,8 @@
         window.location.href = 'host-screen.html';
       } else if (game === 'space-shooter') {
         window.location.href = 'space-shooter-host.html';
+      } else if (game === 'racing') {
+        window.location.href = 'racing-host.html';
       }
     }
 

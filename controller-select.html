@@ -155,6 +155,15 @@
       <div class="arrow">→</div>
     </div>
 
+    <div class="game-card" onclick="selectGame('racing')">
+      <div class="game-icon">🏎️</div>
+      <div class="game-info">
+        <div class="game-title">Turbo Racer</div>
+        <div class="game-desc">Button-smashing racing action</div>
+      </div>
+      <div class="arrow">→</div>
+    </div>
+
     <button class="back-button" onclick="goHome()">← Back to Menu</button>
   </div>
 
@@ -175,6 +184,12 @@
           window.location.href = `controller.html?join=${roomCode}`;
         } else {
           window.location.href = 'controller.html';
+        }
+      } else if (game === 'racing') {
+        if (roomCode) {
+          window.location.href = `racing-controller.html?room=${roomCode}`;
+        } else {
+          window.location.href = 'racing-controller.html';
         }
       }
     }

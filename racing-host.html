@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏎️ Turbo Racer - Host Screen</title>
+  <script src="env.js" onerror="console.log('env.js not found - will use Vercel config')"></script>
+  <script src="config.js"></script>
+  <script src="room-manager.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #000;
+      color: white;
+      overflow: hidden;
+    }
+
+    #setupScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 40px 20px;
+    }
+
+    #setupScreen.hidden {
+      display: none;
+    }
+
+    #gameScreen {
+      display: none;
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: #1a1a1a;
+    }
+
+    #gameScreen.active {
+      display: block;
+    }
+
+    canvas {
+      display: block;
+      background: #1a1a1a;
+    }
+
+    .setup-card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 25px;
+      padding: 40px;
+      text-align: center;
+      border: 2px solid rgba(255,255,255,0.2);
+      max-width: 700px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 3em;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 30px rgba(240, 147, 251, 0.3);
+    }
+
+    .room-code-display {
+      background: rgba(245, 87, 108, 0.2);
+      border: 3px dashed rgba(245, 87, 108, 0.5);
+      border-radius: 20px;
+      padding: 25px;
+      margin: 30px 0;
+    }
+
+    .room-code {
+      font-size: 3.5em;
+      font-weight: 900;
+      letter-spacing: 12px;
+      color: #f5576c;
+      text-shadow: 0 0 25px rgba(245, 87, 108, 0.6);
+    }
+
+    #qrCode {
+      margin: 25px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 20px;
+      display: inline-block;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .game-mode-selector {
+      display: flex;
+      gap: 20px;
+      margin: 30px 0;
+    }
+
+    .mode-card {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 15px;
+      padding: 30px 20px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .mode-card:hover {
+      border-color: #f5576c;
+      background: rgba(245, 87, 108, 0.1);
+      transform: translateY(-5px);
+    }
+
+    .mode-card.selected {
+      border-color: #f5576c;
+      background: rgba(245, 87, 108, 0.2);
+      box-shadow: 0 0 30px rgba(245, 87, 108, 0.3);
+    }
+
+    .mode-icon {
+      font-size: 3em;
+      margin-bottom: 15px;
+    }
+
+    .player-list {
+      margin: 30px 0;
+      min-height: 120px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .player-item {
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 15px 20px;
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border-left: 4px solid;
+      transition: all 0.3s;
+    }
+
+    .player-item:nth-child(1) { border-left-color: #ff0000; }
+    .player-item:nth-child(2) { border-left-color: #00ff00; }
+    .player-item:nth-child(3) { border-left-color: #0000ff; }
+    .player-item:nth-child(4) { border-left-color: #ffff00; }
+    .player-item:nth-child(5) { border-left-color: #ff00ff; }
+    .player-item:nth-child(6) { border-left-color: #00ffff; }
+    .player-item:nth-child(7) { border-left-color: #ff8800; }
+    .player-item:nth-child(8) { border-left-color: #8800ff; }
+
+    .player-item:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .player-avatar {
+      font-size: 2em;
+    }
+
+    .btn {
+      padding: 18px 45px;
+      border: none;
+      border-radius: 15px;
+      font-size: 1.2em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin: 15px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      box-shadow: 0 8px 25px rgba(245, 87, 108, 0.4);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 35px rgba(245, 87, 108, 0.6);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+
+    .control-btn {
+      padding: 12px 24px;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 12px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .control-btn:hover {
+      background: rgba(245, 87, 108, 0.5);
+      border-color: #f5576c;
+      transform: translateY(-2px);
+    }
+
+    .game-controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .setup-card {
+      animation: slideIn 0.6s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div id="setupScreen">
+    <div class="setup-card">
+      <h1>🏎️ Turbo Racer</h1>
+      <p style="font-size: 1.2em; opacity: 0.9; margin-bottom: 25px;">
+        Ultimate Button-Smashing Racing Game!
+      </p>
+
+      <div class="room-code-display">
+        <div style="font-size: 1em; opacity: 0.8; margin-bottom: 10px; font-weight: 600;">ROOM CODE</div>
+        <div class="room-code" id="roomCode">------</div>
+      </div>
+
+      <div id="qrCode"></div>
+
+      <div style="margin: 25px 0;">
+        <div style="font-size: 1em; opacity: 0.8; margin-bottom: 15px; font-weight: 600;">GAME MODE</div>
+        <div class="game-mode-selector">
+          <div class="mode-card selected" onclick="selectRacingMode('multiplayer')" id="modeMultiplayer">
+            <div class="mode-icon">👥</div>
+            <div style="font-weight: 600; font-size: 1.1em;">Multiplayer</div>
+            <div style="font-size: 0.9em; opacity: 0.7; margin-top: 8px;">2-8 players</div>
+          </div>
+          <div class="mode-card" onclick="selectRacingMode('ai')" id="modeAI">
+            <div class="mode-icon">🤖</div>
+            <div style="font-weight: 600; font-size: 1.1em;">vs AI Racers</div>
+            <div style="font-size: 0.9em; opacity: 0.7; margin-top: 8px;">1+ players</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin: 25px 0;">
+        <div style="font-size: 1em; opacity: 0.8; margin-bottom: 12px; font-weight: 600;">CONNECTED RACERS</div>
+        <div class="player-list" id="playerList">
+          <div style="color: #888; font-size: 1em;">Waiting for racers to join...</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="startButton" onclick="startRace()" disabled>
+        ⏳ Waiting for Racers (0/2)
+      </button>
+
+      <div style="margin-top: 20px; color: #888; font-size: 0.95em;" id="playerRequirement">
+        Need at least 2 players to start
+      </div>
+
+      <button class="btn btn-secondary" onclick="backToMenu()">
+        ← Back to Menu
+      </button>
+    </div>
+  </div>
+
+  <div id="gameScreen">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="game-controls">
+      <button class="control-btn" onclick="quitRaceToMenu()">🚪 Quit</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+  <script src="ably-client.js"></script>
+  <script src="racing-host.js"></script>
+
+  <script>
+    function backToMenu() {
+      window.location.href = 'start.html';
+    }
+  </script>
+</body>
+</html>
