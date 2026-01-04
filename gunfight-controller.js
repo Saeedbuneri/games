@@ -281,10 +281,22 @@ class GunFightController {
       const normalizedX = x / maxDistance;
       const normalizedY = y / maxDistance;
       
+      // Apply deadzone to prevent drift from tiny movements
+      const deadzone = 0.15;
+      const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+      
+      let finalX = normalizedX;
+      let finalY = normalizedY;
+      
+      if (magnitude < deadzone) {
+        finalX = 0;
+        finalY = 0;
+      }
+      
       callback({
-        x: normalizedX,
-        y: normalizedY,
-        active: true,
+        x: finalX,
+        y: finalY,
+        active: magnitude >= deadzone,
         distance: limitedDistance / maxDistance
       });
     };

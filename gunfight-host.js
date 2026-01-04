@@ -187,19 +187,19 @@ class GunFightHost {
   
   handleMove(player, data) {
     const speed = player.isCrouching ? 3 : 6;
-    const acceleration = 0.3;
+    const deadzone = 0.15; // Ignore small joystick movements
     
-    // Smooth acceleration instead of instant velocity
-    const targetVx = data.x * speed;
-    const targetVy = data.y * speed;
+    // Check if input is above deadzone
+    const magnitude = Math.sqrt(data.x * data.x + data.y * data.y);
     
-    player.vx += (targetVx - player.vx) * acceleration;
-    player.vy += (targetVy - player.vy) * acceleration;
-    
-    // Apply friction when not moving
-    if (Math.abs(data.x) < 0.1 && Math.abs(data.y) < 0.1) {
-      player.vx *= 0.85;
-      player.vy *= 0.85;
+    if (magnitude < deadzone || !data.active) {
+      // Stop immediately when joystick is released or in deadzone
+      player.vx = 0;
+      player.vy = 0;
+    } else {
+      // Move only when joystick is actively pushed
+      player.vx = data.x * speed;
+      player.vy = data.y * speed;
     }
   }
   
