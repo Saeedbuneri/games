@@ -368,7 +368,12 @@ class GunFightController {
   }
   
   sendMovement() {
-    if (!this.isConnected || !this.gameStarted) return;
+    if (!this.isConnected || !this.gameStarted) {
+      console.log('Cannot send movement - connected:', this.isConnected, 'gameStarted:', this.gameStarted);
+      return;
+    }
+    
+    console.log('Sending movement:', this.moveJoystick);
     
     this.channel.publish('controller-input', {
       playerId: this.playerId,
