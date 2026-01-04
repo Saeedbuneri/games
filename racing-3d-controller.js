@@ -1,4 +1,4 @@
-// 3D Racing Controller Logic
+// 3D Racing Controller Logic - Tap Control
 class Racing3DController {
   constructor() {
     this.roomManager = new RoomManager();
@@ -10,11 +10,10 @@ class Racing3DController {
     this.finished = false;
     this.currentLap = 1;
     
-    // Motion sensors
-    this.steering = 0; // -1 to 1
-    this.speed = 0; // 0 to 2
-    this.tiltAngle = 0;
-    this.pitch = 0;
+    // Tap control
+    this.tapCount = 0;
+    this.lastTapTime = 0;
+    this.speed = 0;
     
     this.init();
   }
@@ -119,54 +118,6 @@ class Racing3DController {
     
     document.getElementById('connectionScreen').classList.remove('active');
     document.getElementById('waitingScreen').classList.add('active');
-    
-    // Request motion permissions
-    this.requestMotionPermission();
-  }
-  
-  async requestMotionPermission() {
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      try {
-        const permission = await DeviceOrientationEvent.requestPermission();
-        if (permission === 'granted') {
-          this.startMotionTracking();
-        } else {
-          alert('Motion sensor permission denied. Please allow motion sensors in settings.');
-        }
-      } catch (error) {
-        console.error('Permission error:', error);
-      }
-    } else {
-      // Android/older browsers - no permission needed
-      this.startMotionTracking();
-    }
-  }
-  
-  startMotionTracking() {
-    window.addEventListener('deviceorientation', (event) => {
-      // Gamma: left/right tilt (-90 to 90)
-      // Beta: front/back tilt (-180 to 180)
-      
-      const gamma = event.gamma || 0;
-      const beta = event.beta || 0;
-      
-      this.tiltAngle = gamma;
-      this.pitch = beta;
-      
-      // Steering: normalize gamma to -1 to 1
-      this.steering = Math.max(-1, Math.min(1, gamma / 45));
-      
-      // Speed: phone upright = fast, tilted forward = slower
-      // Beta around 0-30 = upright/racing position
-      const normalizedBeta = Math.abs(beta - 45); // 45 is typical holding angle
-      this.speed = Math.max(0, Math.min(2, (90 - normalizedBeta) / 45));
-      
-      if (this.raceActive) {
-        this.updateUI();
-      }
-    });
-    
-    console.log('Motion tracking started');
   }
   
   handleRaceStarted() {
@@ -174,6 +125,19 @@ class Racing3DController {
     document.getElementById('racingScreen').classList.add('active');
     
     this.startCountdown();
+  }
+  
+  setupControls() {
+    const tapButton = document.getElementById('tapButton');
+    
+    tapButton.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.handleTap();
+    });
+    
+    tapButton.addEventListener('click', (e) => {
+      this.handleTap();
+    });
   }
   
   startCountdown() {
@@ -198,39 +162,74 @@ class Racing3DController {
   
   startRace() {
     this.raceActive = true;
+    this.tapCount = 0;
+    this.speed = 0;
     
     document.getElementById('raceCountdown').style.display = 'none';
-    document.getElementById('racingControls').style.display = 'block';
+    document.getElementById('tapSection').style.display = 'block';
+    document.getElementById('tapButton').classList.remove('disabled');
     
-    // Start sending controls to host
-    this.controlInterval = setInterval(() => {
-      if (this.raceActive && !this.finished) {
-        this.sendControls();
-      }
-    }, 50); // 20 updates per second
+    this.updateSpeedDisplay();
+    this.setupControls();
   }
   
-  sendControls() {
+  handleTap() {
+    if (!this.raceActive || this.finished) return;
+    
+    const now = Date.now();
+    const timeSinceLastTap = now - this.lastTapTime;
+    
+    this.tapCount++;
+    this.lastTapTime = now;
+    
+    // Speed boost from tapping, decay over time
+    if (timeSinceLastTap < 200) {
+      this.speed = Math.min(this.speed + 0.3, 3);
+    } else {
+      this.speed = Math.max(this.speed + 0.1, 0);
+    }
+    
+    // Haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+    
+    // Update UI
+    document.getElementById('tapCount').textContent = `Taps: ${this.tapCount}`;
+    this.updateSpeedDisplay();
+    
+    // Send speed to host
     this.channel.publish('racerControl', {
       playerId: this.playerId,
-      steering: this.steering,
-      speed: this.speed,
-      timestamp: Date.now()
+      speed: this.speed
     });
   }
   
-  updateUI() {
-    // Update steering wheel rotation
-    const steeringWheel = document.getElementById('steeringWheel');
-    steeringWheel.style.transform = `rotate(${this.steering * 90}deg)`;
+  updateSpeedDisplay() {
+    const speedKmh = Math.round(this.speed * 100);
+    document.getElementById('speedDisplay').textContent = `${speedKmh} km/h`;
+    document.getElementById('speedBar').style.width = `${Math.min(this.speed / 3 * 100, 100)}%`;
+  }
+  
+  startRace() {
+    this.raceActive = true;
+    this.tapCount = 0;
+    this.speed = 0;
     
-    // Update tilt indicator
-    document.getElementById('tiltIndicator').textContent = `Tilt: ${Math.round(this.tiltAngle)}°`;
+    document.getElementById('raceCountdown').style.display = 'none';
+    document.getElementById('tapSection').style.display = 'block';
+    document.getElementById('tapButton').classList.remove('disabled');
     
-    // Update speedometer
-    const speedPercent = (this.speed / 2) * 100;
-    document.getElementById('speedDisplay').textContent = Math.round(speedPercent);
-    document.getElementById('speedBar').style.width = `${speedPercent}%`;
+    this.updateSpeedDisplay();
+    
+    // Speed decay interval
+    this.controlInterval = setInterval(() => {
+      if (this.raceActive && !this.finished) {
+        // Natural speed decay
+        this.speed = Math.max(0, this.speed * 0.96);
+        this.updateSpeedDisplay();
+      }
+    }, 100);
   }
   
   handleRacerFinished(data) {

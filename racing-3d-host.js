@@ -440,8 +440,8 @@ class Racing3DGame {
   handleRacerControl(data) {
     const racer = this.racers.find(r => r.id === data.playerId);
     if (racer && !racer.finished && this.raceActive) {
-      // Speed from phone tilt (0 to 2)
-      racer.speed = Math.max(0, Math.min(data.speed * 2, 3));
+      // Direct speed from tap control (0 to 3)
+      racer.speed = Math.max(0, Math.min(data.speed, 3));
     }
   }
   
