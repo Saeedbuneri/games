@@ -152,8 +152,8 @@ class AblyRestClient {
       }
     };
 
-    // Poll every 400ms for good balance of responsiveness and performance
-    const intervalId = setInterval(poll, 400);
+    // Poll every 100ms for better responsiveness in FPS gameplay
+    const intervalId = setInterval(poll, 100);
     this.pollingIntervals.set(channelName, intervalId);
     
     // Initial poll

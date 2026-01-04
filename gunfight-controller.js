@@ -25,6 +25,11 @@ class GunFightController {
     // Touch tracking
     this.activeTouches = new Map();
     
+    // Input throttling
+    this.lastMoveTime = 0;
+    this.lastLookTime = 0;
+    this.inputThrottle = 50; // ms between updates
+    
     this.init();
   }
   
@@ -189,7 +194,7 @@ class GunFightController {
     this.setupButton(fireBtn, () => {
       this.fire();
     }, () => {
-      // On hold - continuous fire
+      this.fire();
     });
     
     // Jump Button
@@ -237,38 +242,54 @@ class GunFightController {
     const container = document.getElementById(containerId);
     const stick = document.getElementById(stickId);
     
-    const maxDistance = 35; // Maximum distance from center (adjusted for smaller joystick)
-    let startX, startY, centerX, centerY;
-    let isActive = false;
+    const maxDistance = 35;
+    let activeTouchId = null;
+    let centerX, centerY;
     
     const handleStart = (e) => {
       e.preventDefault();
       
-      isActive = true;
-      const touch = e.touches ? e.touches[0] : e;
+      // If already active, ignore new starts
+      if (activeTouchId !== null) return;
+
       const rect = container.getBoundingClientRect();
-      
       centerX = rect.left + rect.width / 2;
       centerY = rect.top + rect.height / 2;
-      startX = touch.clientX;
-      startY = touch.clientY;
-      
-      // Track this touch
-      const touchId = e.touches ? e.touches[0].identifier : 'mouse';
-      this.activeTouches.set(touchId, containerId);
+
+      const touches = e.changedTouches || [e];
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const dx = touch.clientX - centerX;
+        const dy = touch.clientY - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // If touch is within or near the container
+        if (dist < rect.width) {
+          activeTouchId = touch.identifier !== undefined ? touch.identifier : 'mouse';
+          this.activeTouches.set(activeTouchId, containerId);
+          updateJoystick(touch);
+          break;
+        }
+      }
     };
     
     const handleMove = (e) => {
+      if (activeTouchId === null) return;
       e.preventDefault();
       
-      if (!isActive) return;
-      
-      const touch = e.touches ? e.touches[0] : e;
-      const touchId = e.touches ? e.touches[0].identifier : 'mouse';
-      
-      // Only handle if this touch started on this joystick
-      if (this.activeTouches.get(touchId) !== containerId) return;
-      
+      const touches = e.changedTouches || [e];
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const id = touch.identifier !== undefined ? touch.identifier : 'mouse';
+        
+        if (id === activeTouchId) {
+          updateJoystick(touch);
+          break;
+        }
+      }
+    };
+
+    const updateJoystick = (touch) => {
       const deltaX = touch.clientX - centerX;
       const deltaY = touch.clientY - centerY;
       
@@ -282,63 +303,61 @@ class GunFightController {
       stick.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
       
       // Normalize values
-      const normalizedX = x / maxDistance;
-      const normalizedY = y / maxDistance;
+      let normalizedX = x / maxDistance;
+      let normalizedY = y / maxDistance;
       
-      // Apply deadzone to prevent drift from tiny movements
+      // Apply deadzone with smooth re-scaling
       const deadzone = 0.2;
       const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
       
-      let finalX = normalizedX;
-      let finalY = normalizedY;
-      
       if (magnitude < deadzone) {
-        finalX = 0;
-        finalY = 0;
+        normalizedX = 0;
+        normalizedY = 0;
+      } else {
+        // Re-scale magnitude to start from 0 at the deadzone edge
+        const scaledMag = (magnitude - deadzone) / (1 - deadzone);
+        normalizedX = (normalizedX / magnitude) * scaledMag;
+        normalizedY = (normalizedY / magnitude) * scaledMag;
       }
       
       callback({
-        x: finalX,
-        y: finalY,
+        x: normalizedX,
+        y: normalizedY,
         active: magnitude >= deadzone,
-        distance: limitedDistance / maxDistance
+        angle: angle
       });
     };
     
     const handleEnd = (e) => {
-      e.preventDefault();
+      if (activeTouchId === null) return;
       
-      isActive = false;
-      const touchId = e.changedTouches ? e.changedTouches[0].identifier : 'mouse';
-      
-      // Only handle if this touch was on this joystick
-      if (this.activeTouches.get(touchId) !== containerId) return;
-      
-      this.activeTouches.delete(touchId);
-      
-      stick.style.transform = 'translate(-50%, -50%)';
-      
-      callback({
-        x: 0,
-        y: 0,
-        active: false,
-        distance: 0
-      });
+      const touches = e.changedTouches || [e];
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const id = touch.identifier !== undefined ? touch.identifier : 'mouse';
+        
+        if (id === activeTouchId) {
+          e.preventDefault();
+          activeTouchId = null;
+          this.activeTouches.delete(id);
+          
+          stick.style.transform = 'translate(-50%, -50%)';
+          callback({ x: 0, y: 0, active: false, angle: 0 });
+          break;
+        }
+      }
     };
     
     // Touch events
     container.addEventListener('touchstart', handleStart, { passive: false });
     container.addEventListener('touchmove', handleMove, { passive: false });
     container.addEventListener('touchend', handleEnd, { passive: false });
+    container.addEventListener('touchcancel', handleEnd, { passive: false });
     
     // Mouse events for testing
     container.addEventListener('mousedown', handleStart);
-    document.addEventListener('mousemove', (e) => {
-      if (this.activeTouches.has('mouse') && this.activeTouches.get('mouse') === containerId) {
-        handleMove(e);
-      }
-    });
-    document.addEventListener('mouseup', handleEnd);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
   }
   
   setupButton(button, onPress, onHold) {
@@ -353,7 +372,7 @@ class GunFightController {
         holdTimer = setInterval(() => {
           isHolding = true;
           onHold();
-        }, 100);
+        }, 150);
       }
     };
     
@@ -385,12 +404,12 @@ class GunFightController {
   }
   
   sendMovement() {
-    if (!this.isConnected || !this.gameStarted) {
-      console.log('Cannot send movement - connected:', this.isConnected, 'gameStarted:', this.gameStarted);
-      return;
-    }
+    if (!this.isConnected || !this.gameStarted) return;
     
-    console.log('Sending movement:', this.moveJoystick);
+    const now = Date.now();
+    // Only throttle if joystick is active. If released, send immediately to stop.
+    if (this.moveJoystick.active && now - this.lastMoveTime < this.inputThrottle) return;
+    this.lastMoveTime = now;
     
     this.channel.publish('controller-input', {
       playerId: this.playerId,
@@ -400,12 +419,31 @@ class GunFightController {
         y: this.moveJoystick.y,
         active: this.moveJoystick.active
       },
-      timestamp: Date.now()
+      timestamp: now
     });
+
+    // If stopping, send a second message shortly after to ensure it's received
+    if (!this.moveJoystick.active) {
+      setTimeout(() => {
+        if (!this.moveJoystick.active) {
+          this.channel.publish('controller-input', {
+            playerId: this.playerId,
+            type: 'move',
+            data: { x: 0, y: 0, active: false },
+            timestamp: Date.now()
+          });
+        }
+      }, 100);
+    }
   }
   
   sendLook() {
     if (!this.isConnected || !this.gameStarted) return;
+    
+    const now = Date.now();
+    // Only throttle if joystick is active.
+    if (this.lookJoystick.active && now - this.lastLookTime < this.inputThrottle) return;
+    this.lastLookTime = now;
     
     this.channel.publish('controller-input', {
       playerId: this.playerId,
@@ -413,9 +451,10 @@ class GunFightController {
       data: {
         x: this.lookJoystick.x,
         y: this.lookJoystick.y,
-        active: this.lookJoystick.active
+        active: this.lookJoystick.active,
+        angle: this.lookJoystick.angle
       },
-      timestamp: Date.now()
+      timestamp: now
     });
   }
   

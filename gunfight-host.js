@@ -194,42 +194,37 @@ class GunFightHost {
   
   handleMove(player, data) {
     const speed = player.isCrouching ? 2 : 4.5;
-    const deadzone = 0.2; // Increased deadzone for better control
+    player.lastMoveUpdate = Date.now();
     
-    // Check if joystick is not active or input is too small
     if (!data.active) {
-      // Stop immediately when joystick is not being touched
       player.vx = 0;
       player.vy = 0;
       return;
     }
     
-    // Check if input magnitude is above deadzone
+    // The controller now sends pre-normalized and deadzone-corrected values
     const magnitude = Math.sqrt(data.x * data.x + data.y * data.y);
     
-    if (magnitude < deadzone) {
-      // Stop when in deadzone
+    if (magnitude === 0) {
       player.vx = 0;
       player.vy = 0;
     } else {
-      // Apply a curve to make small movements more precise (less sensitive)
-      // We normalize the magnitude above the deadzone and then apply a power
-      const normalizedMag = (magnitude - deadzone) / (1 - deadzone);
-      const curvedMag = Math.pow(normalizedMag, 1.5); // 1.5 power curve for better feel
+      // Apply a slight curve for better feel
+      const curvedMag = Math.pow(magnitude, 1.2); 
       
-      const dirX = data.x / magnitude;
-      const dirY = data.y / magnitude;
-      
-      player.vx = dirX * curvedMag * speed;
-      player.vy = dirY * curvedMag * speed;
+      player.vx = (data.x / magnitude) * curvedMag * speed;
+      player.vy = (data.y / magnitude) * curvedMag * speed;
     }
   }
   
   handleLook(player, data) {
     if (data.active) {
-      // Convert joystick input to angle
-      const angle = Math.atan2(data.y, data.x);
-      player.angle = angle;
+      // Use the angle provided by the controller or calculate it
+      if (data.angle !== undefined) {
+        player.angle = data.angle;
+      } else {
+        player.angle = Math.atan2(data.y, data.x);
+      }
     }
   }
   
@@ -580,6 +575,14 @@ class GunFightHost {
     // Update all players
     for (const [id, player] of this.players) {
       if (player.health <= 0) continue;
+
+      // Stop player if no movement update received for a while (timeout)
+      if (player.lastMoveUpdate && now - player.lastMoveUpdate > 300) {
+        player.vx *= 0.5;
+        player.vy *= 0.5;
+        if (Math.abs(player.vx) < 0.1) player.vx = 0;
+        if (Math.abs(player.vy) < 0.1) player.vy = 0;
+      }
 
       // Try moving in X
       const oldX = player.x;
