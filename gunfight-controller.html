@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🔫 Gun Fight Controller</title>
+  <script src="env.js" onerror="console.log('env.js not found - will use Vercel config')"></script>
+  <script src="config.js"></script>
+  <script src="room-manager.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      color: white;
+      overflow: hidden;
+      touch-action: none;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+
+    .screen {
+      display: none;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      border: 2px solid rgba(255,255,255,0.2);
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      margin: 20px 0;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 1.5em;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+
+    .btn {
+      padding: 15px 40px;
+      border: none;
+      border-radius: 15px;
+      font-size: 1.1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin: 10px;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ff4444, #cc0000);
+      color: white;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Game Controller - Landscape Mode */
+    .controller {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Status Bar at Top */
+    .status-bar {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 100;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 20px;
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9em;
+      font-weight: 600;
+    }
+
+    .health-bar {
+      width: 80px;
+      height: 8px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .health-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff4444, #ff8844);
+      transition: width 0.3s;
+    }
+
+    .ammo-count {
+      color: #ffaa00;
+      font-weight: bold;
+    }
+
+    /* Left Side - Movement Joystick */
+    .left-controls {
+      position: absolute;
+      left: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 180px;
+      height: 180px;
+    }
+
+    .joystick-container {
+      position: relative;
+      width: 180px;
+      height: 180px;
+      background: rgba(255,255,255,0.1);
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      touch-action: none;
+    }
+
+    .joystick-stick {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      background: radial-gradient(circle, rgba(255,255,255,0.5), rgba(255,255,255,0.2));
+      border: 3px solid rgba(255,255,255,0.5);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.1s;
+      pointer-events: none;
+    }
+
+    /* Right Side - Look Joystick */
+    .right-controls {
+      position: absolute;
+      right: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 180px;
+      height: 180px;
+    }
+
+    .look-joystick-container {
+      position: relative;
+      width: 180px;
+      height: 180px;
+      background: rgba(255,100,100,0.15);
+      border: 3px solid rgba(255,100,100,0.4);
+      border-radius: 50%;
+      touch-action: none;
+    }
+
+    .look-joystick-stick {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      background: radial-gradient(circle, rgba(255,100,100,0.6), rgba(255,100,100,0.3));
+      border: 3px solid rgba(255,100,100,0.6);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.1s;
+      pointer-events: none;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+      position: absolute;
+      right: 240px;
+      bottom: 30px;
+      display: flex;
+      gap: 15px;
+    }
+
+    .action-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3em;
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      touch-action: none;
+      transition: all 0.1s;
+    }
+
+    .action-btn:active {
+      transform: scale(0.9);
+      background: rgba(255,255,255,0.3);
+    }
+
+    .action-btn.jump {
+      background: rgba(100,255,100,0.2);
+      border-color: rgba(100,255,100,0.5);
+    }
+
+    .action-btn.reload {
+      background: rgba(255,200,0,0.2);
+      border-color: rgba(255,200,0,0.5);
+    }
+
+    .action-btn.grenade {
+      background: rgba(255,100,0,0.2);
+      border-color: rgba(255,100,0,0.5);
+    }
+
+    /* Fire Button */
+    .fire-button {
+      position: absolute;
+      right: 240px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,0,0,0.4), rgba(200,0,0,0.2));
+      border: 5px solid rgba(255,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      cursor: pointer;
+      touch-action: none;
+      transition: all 0.1s;
+      box-shadow: 0 0 20px rgba(255,0,0,0.3);
+    }
+
+    .fire-button:active {
+      transform: translateY(-50%) scale(0.85);
+      background: radial-gradient(circle, rgba(255,0,0,0.7), rgba(200,0,0,0.4));
+      box-shadow: 0 0 30px rgba(255,0,0,0.6);
+    }
+
+    /* Utility Buttons */
+    .utility-buttons {
+      position: absolute;
+      left: 240px;
+      bottom: 30px;
+      display: flex;
+      gap: 15px;
+    }
+
+    .utility-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1em;
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      touch-action: none;
+      transition: all 0.1s;
+    }
+
+    .utility-btn:active {
+      transform: scale(0.9);
+      background: rgba(255,255,255,0.3);
+    }
+
+    .utility-btn.crouch {
+      background: rgba(100,100,255,0.2);
+      border-color: rgba(100,100,255,0.5);
+    }
+
+    .utility-btn.medkit {
+      background: rgba(0,255,100,0.2);
+      border-color: rgba(0,255,100,0.5);
+    }
+
+    /* Weapon Switch */
+    .weapon-switch {
+      position: absolute;
+      left: 240px;
+      top: 30px;
+      display: flex;
+      gap: 10px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+    }
+
+    .weapon-slot {
+      width: 60px;
+      height: 60px;
+      border-radius: 10px;
+      border: 3px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+      cursor: pointer;
+      touch-action: none;
+      transition: all 0.2s;
+    }
+
+    .weapon-slot.active {
+      border-color: #ffaa00;
+      background: rgba(255,170,0,0.2);
+      transform: scale(1.1);
+    }
+
+    .weapon-slot:active {
+      transform: scale(0.95);
+    }
+
+    .weapon-label {
+      font-size: 0.5em;
+      margin-top: 2px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    /* Aim Mode Indicator */
+    .aim-mode {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border: 2px solid rgba(255,0,0,0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      display: none;
+    }
+
+    .aim-mode.active {
+      display: block;
+      animation: pulse 1s infinite;
+    }
+
+    .aim-mode::before,
+    .aim-mode::after {
+      content: '';
+      position: absolute;
+      background: rgba(255,0,0,0.8);
+    }
+
+    .aim-mode::before {
+      width: 2px;
+      height: 20px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .aim-mode::after {
+      width: 20px;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Notifications */
+    .notification {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 1.1em;
+      font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .notification.show {
+      opacity: 1;
+    }
+
+    /* Landscape Mode Warning */
+    @media (orientation: portrait) {
+      .controller::before {
+        content: '📱 Please rotate to landscape mode';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.9);
+        padding: 30px;
+        border-radius: 20px;
+        font-size: 1.2em;
+        text-align: center;
+        z-index: 1000;
+      }
+    }
+
+    .waiting {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top-color: #ff4444;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Join Screen -->
+  <div id="joinScreen" class="screen active">
+    <div class="card">
+      <h1>🔫 Gun Fight</h1>
+      <p style="margin-bottom: 30px; opacity: 0.9;">Join the battle!</p>
+      
+      <div class="input-group">
+        <input type="text" id="roomCodeInput" placeholder="ROOM CODE" maxlength="4" autocomplete="off">
+      </div>
+      
+      <button class="btn btn-primary" id="joinBtn">
+        JOIN BATTLE
+      </button>
+      
+      <p style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">
+        Enter the 4-letter room code from the host screen
+      </p>
+    </div>
+  </div>
+
+  <!-- Waiting Screen -->
+  <div id="waitingScreen" class="screen">
+    <div class="card waiting">
+      <h1>⚔️ Ready to Fight!</h1>
+      <div class="spinner"></div>
+      <p>Connected to room: <strong id="connectedRoom"></strong></p>
+      <p style="margin-top: 15px; opacity: 0.8;">Waiting for battle to start...</p>
+      <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.6;">Rotate to landscape when ready</p>
+    </div>
+  </div>
+
+  <!-- Game Controller Screen -->
+  <div id="controllerScreen" class="screen">
+    <div class="controller">
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="status-item">
+          ❤️ <div class="health-bar"><div class="health-fill" id="healthFill" style="width: 100%"></div></div>
+        </div>
+        <div class="status-item">
+          <span class="ammo-count" id="ammoCount">30/120</span>
+        </div>
+        <div class="status-item" id="scoreDisplay">
+          🎯 Score: <span id="score">0</span>
+        </div>
+      </div>
+
+      <!-- Weapon Switch -->
+      <div class="weapon-switch">
+        <div class="weapon-slot active" data-weapon="primary" id="weaponPrimary">
+          🔫
+          <div class="weapon-label">Rifle</div>
+        </div>
+        <div class="weapon-slot" data-weapon="secondary" id="weaponSecondary">
+          🔪
+          <div class="weapon-label">Pistol</div>
+        </div>
+        <div class="weapon-slot" data-weapon="sniper" id="weaponSniper">
+          🎯
+          <div class="weapon-label">Sniper</div>
+        </div>
+      </div>
+
+      <!-- Left Side - Movement Joystick -->
+      <div class="left-controls">
+        <div class="joystick-container" id="moveJoystick">
+          <div class="joystick-stick" id="moveStick"></div>
+        </div>
+      </div>
+
+      <!-- Right Side - Look/Aim Joystick -->
+      <div class="right-controls">
+        <div class="look-joystick-container" id="lookJoystick">
+          <div class="look-joystick-stick" id="lookStick"></div>
+        </div>
+      </div>
+
+      <!-- Fire Button -->
+      <div class="fire-button" id="fireButton">
+        🔥
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <div class="action-btn jump" id="jumpBtn">⬆️</div>
+        <div class="action-btn reload" id="reloadBtn">🔄</div>
+        <div class="action-btn grenade" id="grenadeBtn">💣</div>
+      </div>
+
+      <!-- Utility Buttons -->
+      <div class="utility-buttons">
+        <div class="utility-btn crouch" id="crouchBtn">⬇️</div>
+        <div class="utility-btn medkit" id="medkitBtn">💊</div>
+      </div>
+
+      <!-- Aim Mode Crosshair -->
+      <div class="aim-mode" id="aimMode"></div>
+
+      <!-- Notification -->
+      <div class="notification" id="notification"></div>
+    </div>
+  </div>
+
+  <script src="gunfight-controller.js"></script>
+</body>
+</html>
