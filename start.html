@@ -400,6 +400,14 @@
           </div>
         </button>
         
+        <button class="role-button" onclick="openGame('gunfight')">
+          <div class="role-icon">🔫</div>
+          <div class="role-content">
+            <div class="role-title">Gun Fight FPS</div>
+            <div class="role-desc">Intense FPS battle with dual joystick controls</div>
+          </div>
+        </button>
+        
         <button class="back-button" onclick="goBack()">← Back</button>
       </div>
       
@@ -527,6 +535,8 @@
         window.location.href = 'racing-host.html';
       } else if (game === 'racing-3d') {
         window.location.href = 'racing-3d-host.html';
+      } else if (game === 'gunfight') {
+        window.location.href = 'gunfight-host.html';
       }
     }
 
