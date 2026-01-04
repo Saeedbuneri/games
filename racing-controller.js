@@ -24,16 +24,15 @@ class RacingController {
       const roomCode = urlParams.get('room');
       
       if (roomCode) {
-        // Auto-join if room code is in URL
-        document.getElementById('codeEntryScreen').classList.remove('active');
-        document.getElementById('connectionScreen').classList.add('active');
+        // Auto-join if room code is in URL (from QR code)
         this.roomManager.roomCode = roomCode;
         this.playerId = 'player-' + Math.random().toString(36).substr(2, 9);
         await this.connectToAbly();
         this.setupControls();
         console.log('Racing controller ready!');
       } else {
-        // Show code entry screen
+        // Show code entry screen for manual entry
+        document.getElementById('connectionScreen').classList.remove('active');
         document.getElementById('codeEntryScreen').classList.add('active');
         this.setupCodeEntry();
       }
