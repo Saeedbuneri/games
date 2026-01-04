@@ -29,8 +29,8 @@ const CONFIG = {
   GAME_CHANNEL: 'badminton-game-room-1',
   
   // Physics constants
-  GRAVITY: 980, // pixels/s^2
-  AIR_RESISTANCE: 0.98,
+  GRAVITY: 600, // pixels/s^2 - reduced for more arcade-like feel
+  AIR_RESISTANCE: 0.985, // Less resistance for better flight
   COURT_WIDTH: 1200,
   COURT_HEIGHT: 800,
   NET_HEIGHT: 150,
@@ -40,7 +40,7 @@ const CONFIG = {
   SMASH_THRESHOLD: 15, // m/s^2 (high acceleration)
   DROP_SHOT_THRESHOLD: 5, // m/s^2 (low acceleration)
   MIN_SWING_SPEED: 3, // Minimum speed to register a hit
-  HIT_ZONE_RADIUS: 100, // Pixels around player position
+  HIT_ZONE_RADIUS: 250, // Pixels around player position - larger for better gameplay
   
   // Sensor smoothing
   SMOOTHING_FACTOR: 0.7, // Low-pass filter (0-1, higher = more smoothing)

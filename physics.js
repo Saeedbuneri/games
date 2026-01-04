@@ -27,36 +27,41 @@ class ShuttlecockPhysics {
     // Determine if player is on left or right side
     const isLeftSide = playerX < CONFIG.NET_POSITION;
     
+    // Base speed multiplier for better control
+    const baseSpeed = speed * 30; // Scale up for better visibility
+    
     switch(angle) {
       case 'overhead':
         // Smash downward across net
-        vx = isLeftSide ? speed * 0.7 : -speed * 0.7;
-        vy = isSmash ? -speed * 1.2 : -speed * 0.5; // More downward for smash
+        vx = isLeftSide ? baseSpeed * 0.9 : -baseSpeed * 0.9;
+        vy = isSmash ? baseSpeed * 0.3 : -baseSpeed * 0.8; // Smash goes down faster
         break;
         
       case 'forehand':
-        vx = isLeftSide ? speed : -speed;
-        vy = -speed * 0.5;
+        vx = isLeftSide ? baseSpeed : -baseSpeed;
+        vy = -baseSpeed * 0.7; // Arc over net
         break;
         
       case 'backhand':
-        vx = isLeftSide ? speed * 0.8 : -speed * 0.8;
-        vy = -speed * 0.4;
+        vx = isLeftSide ? baseSpeed * 0.85 : -baseSpeed * 0.85;
+        vy = -baseSpeed * 0.6;
         break;
         
       case 'underhand':
         // High clear shot
-        vx = isLeftSide ? speed * 0.6 : -speed * 0.6;
-        vy = -speed * 1.5;
+        vx = isLeftSide ? baseSpeed * 0.7 : -baseSpeed * 0.7;
+        vy = -baseSpeed * 1.2; // High arc
         break;
         
       default: // neutral
-        vx = isLeftSide ? speed * 0.8 : -speed * 0.8;
-        vy = -speed * 0.6;
+        vx = isLeftSide ? baseSpeed * 0.85 : -baseSpeed * 0.85;
+        vy = -baseSpeed * 0.75;
     }
     
     // Add spin effect to horizontal velocity
-    vx += this.spinFactor * 0.1;
+    if (Math.abs(this.spinFactor) > 10) {
+      vx += (this.spinFactor / 10) * 20;
+    }
     
     this.velocity.x = vx;
     this.velocity.y = vy;
@@ -236,17 +241,26 @@ class GameState {
     const player = this.players.get(playerId);
     if (!player) return null;
     
+    // Check if shuttlecock is on player's side of the court
+    const playerOnLeft = player.side === 'left';
+    const shuttlecockOnPlayerSide = playerOnLeft ? 
+      (this.shuttlecock.position.x < CONFIG.NET_POSITION + 100) :
+      (this.shuttlecock.position.x > CONFIG.NET_POSITION - 100);
+    
     // Use predictive position to account for latency
     const predictedPos = this.shuttlecock.predictPosition(CONFIG.PREDICTION_LOOKAHEAD);
     
-    const inHitZone = Utils.distance(
+    const distance = Utils.distance(
       predictedPos.x,
       predictedPos.y,
       player.position.x,
       player.position.y
-    ) <= CONFIG.HIT_ZONE_RADIUS;
+    );
     
-    if (inHitZone || !this.shuttlecock.isActive) {
+    const inHitZone = distance <= CONFIG.HIT_ZONE_RADIUS;
+    
+    // Allow hit if: shuttlecock is not active (serve) OR it's in hit zone AND on player's side
+    if (!this.shuttlecock.isActive || (inHitZone && shuttlecockOnPlayerSide)) {
       // Hit successful!
       this.shuttlecock.launch(
         player.position.x,
@@ -267,7 +281,7 @@ class GameState {
       };
     }
     
-    return { success: false, reason: 'miss' };
+    return { success: false, reason: 'miss', distance: Math.round(distance) };
   }
   
   update() {
