@@ -93,6 +93,10 @@ class GunFightController {
       this.channel.subscribe('player-update', (message) => {
         this.handlePlayerUpdate(message.data);
       });
+
+      this.channel.subscribe('game-over', (message) => {
+        this.handleGameOver(message.data);
+      });
       
       // Wait for connection, then announce player joined
       this.ably.connection.on('connected', () => {
@@ -174,6 +178,44 @@ class GunFightController {
         navigator.vibrate([100, 100, 100, 100, 100]);
       }
     }
+  }
+
+  handleGameOver(data) {
+    const isWinner = data.winnerId === this.playerId;
+    if (isWinner) {
+      this.showNotification('🏆 YOU WIN! 🏆');
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200, 100, 500]);
+      }
+    } else {
+      this.showNotification('💀 GAME OVER 💀');
+      if (navigator.vibrate) {
+        navigator.vibrate(500);
+      }
+    }
+    this.gameStarted = false;
+  }
+
+  playShootSound() {
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const oscillator = this.audioCtx.createOscillator();
+    const gainNode = this.audioCtx.createGain();
+    
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(150, this.audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(40, this.audioCtx.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.1);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(this.audioCtx.currentTime + 0.1);
   }
   
   setupControllers() {
@@ -492,10 +534,8 @@ class GunFightController {
     
     this.sendAction('fire', true);
     
-    // Vibration feedback
-    if (navigator.vibrate) {
-      navigator.vibrate(30);
-    }
+    // Play shooting sound
+    this.playShootSound();
     
     // Decrease ammo (will be synced from host)
     this.ammo = Math.max(0, this.ammo - 1);
@@ -504,10 +544,6 @@ class GunFightController {
   
   jump() {
     this.sendAction('jump', true);
-    
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
-    }
   }
   
   reload() {

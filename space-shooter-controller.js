@@ -10,6 +10,11 @@ class SpaceShooterController {
     this.gameStarted = false;
     this.health = 100;
     
+    // Joystick state
+    this.moveJoystick = { x: 0, y: 0, active: false };
+    this.lastMoveTime = 0;
+    this.inputThrottle = 50;
+    
     this.init();
   }
   
@@ -54,67 +59,127 @@ class SpaceShooterController {
   }
   
   setupControls() {
-    // Up button
-    const btnUp = document.getElementById('btnUp');
-    btnUp.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.sendAction('moveUp', true);
-      btnUp.style.background = 'rgba(102, 126, 234, 0.6)';
-    });
-    btnUp.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.sendAction('moveUp', false);
-      btnUp.style.background = 'rgba(102, 126, 234, 0.3)';
-    });
-    btnUp.addEventListener('mousedown', () => {
-      this.sendAction('moveUp', true);
-      btnUp.style.background = 'rgba(102, 126, 234, 0.6)';
-    });
-    btnUp.addEventListener('mouseup', () => {
-      this.sendAction('moveUp', false);
-      btnUp.style.background = 'rgba(102, 126, 234, 0.3)';
-    });
-    
-    // Down button
-    const btnDown = document.getElementById('btnDown');
-    btnDown.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.sendAction('moveDown', true);
-      btnDown.style.background = 'rgba(102, 126, 234, 0.6)';
-    });
-    btnDown.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.sendAction('moveDown', false);
-      btnDown.style.background = 'rgba(102, 126, 234, 0.3)';
-    });
-    btnDown.addEventListener('mousedown', () => {
-      this.sendAction('moveDown', true);
-      btnDown.style.background = 'rgba(102, 126, 234, 0.6)';
-    });
-    btnDown.addEventListener('mouseup', () => {
-      this.sendAction('moveDown', false);
-      btnDown.style.background = 'rgba(102, 126, 234, 0.3)';
-    });
-    
-    // Fire button
-    const btnFire = document.getElementById('btnFire');
-    btnFire.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.sendAction('shoot', true);
-      this.triggerHaptic([10]);
-    });
-    btnFire.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.sendAction('shoot', false);
-    });
-    btnFire.addEventListener('mousedown', () => {
-      this.sendAction('shoot', true);
-    });
-    btnFire.addEventListener('mouseup', () => {
-      this.sendAction('shoot', false);
+    this.setupJoystick('moveJoystick', 'moveStick', (data) => {
+      this.moveJoystick = data;
+      this.sendMovement();
+      
+      // Fire when joystick is pushed towards boundary
+      const magnitude = Math.sqrt(data.x * data.x + data.y * data.y);
+      const container = document.getElementById('moveJoystick');
+      
+      if (magnitude > 0.8 && this.gameStarted) {
+        this.sendAction('shoot', true);
+        container.classList.add('firing');
+      } else {
+        this.sendAction('shoot', false);
+        container.classList.remove('firing');
+      }
     });
   }
-  
+
+  setupJoystick(containerId, stickId, callback) {
+    const container = document.getElementById(containerId);
+    const stick = document.getElementById(stickId);
+    const maxDistance = 40;
+    let activeTouchId = null;
+    let centerX, centerY;
+
+    const handleStart = (e) => {
+      e.preventDefault();
+      if (activeTouchId !== null) return;
+      const rect = container.getBoundingClientRect();
+      centerX = rect.left + rect.width / 2;
+      centerY = rect.top + rect.height / 2;
+      const touches = e.changedTouches || [e];
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        activeTouchId = touch.identifier !== undefined ? touch.identifier : 'mouse';
+        updateJoystick(touch);
+        break;
+      }
+    };
+
+    const handleMove = (e) => {
+      if (activeTouchId === null) return;
+      e.preventDefault();
+      const touches = e.changedTouches || [e];
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const id = touch.identifier !== undefined ? touch.identifier : 'mouse';
+        if (id === activeTouchId) {
+          updateJoystick(touch);
+          break;
+        }
+      }
+    };
+
+    const updateJoystick = (touch) => {
+      const deltaX = touch.clientX - centerX;
+      const deltaY = touch.clientY - centerY;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      const angle = Math.atan2(deltaY, deltaX);
+      const limitedDistance = Math.min(distance, maxDistance);
+      const x = Math.cos(angle) * limitedDistance;
+      const y = Math.sin(angle) * limitedDistance;
+      stick.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+      let normalizedX = x / maxDistance;
+      let normalizedY = y / maxDistance;
+      const deadzone = 0.15;
+      const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+      if (magnitude < deadzone) {
+        normalizedX = 0;
+        normalizedY = 0;
+      } else {
+        const scaledMag = (magnitude - deadzone) / (1 - deadzone);
+        normalizedX = (normalizedX / magnitude) * scaledMag;
+        normalizedY = (normalizedY / magnitude) * scaledMag;
+      }
+      callback({ x: normalizedX, y: normalizedY, active: magnitude >= deadzone });
+    };
+
+    const handleEnd = (e) => {
+      if (activeTouchId === null) return;
+      const touches = e.changedTouches || [e];
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const id = touch.identifier !== undefined ? touch.identifier : 'mouse';
+        if (id === activeTouchId) {
+          activeTouchId = null;
+          stick.style.transform = 'translate(-50%, -50%)';
+          callback({ x: 0, y: 0, active: false });
+          break;
+        }
+      }
+    };
+
+    container.addEventListener('touchstart', handleStart, { passive: false });
+    container.addEventListener('touchmove', handleMove, { passive: false });
+    container.addEventListener('touchend', handleEnd, { passive: false });
+    container.addEventListener('touchcancel', handleEnd, { passive: false });
+    container.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+  }
+
+  sendMovement() {
+    if (!this.isConnected || !this.gameStarted) return;
+    const now = Date.now();
+    if (this.moveJoystick.active && now - this.lastMoveTime < this.inputThrottle) return;
+    this.lastMoveTime = now;
+    
+    // Space shooter uses moveUp/moveDown actions
+    if (this.moveJoystick.y < -0.3) {
+      this.sendAction('moveUp', true);
+      this.sendAction('moveDown', false);
+    } else if (this.moveJoystick.y > 0.3) {
+      this.sendAction('moveUp', false);
+      this.sendAction('moveDown', true);
+    } else {
+      this.sendAction('moveUp', false);
+      this.sendAction('moveDown', false);
+    }
+  }
+
   showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
@@ -204,9 +269,7 @@ class SpaceShooterController {
     
     switch (event.type) {
       case 'shoot':
-        if (event.side === this.playerSide) {
-          this.triggerHaptic([5]);
-        }
+        // Vibration removed as per request
         break;
         
       case 'hit':

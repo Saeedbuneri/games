@@ -267,6 +267,9 @@ class GunFightHost {
     player.lastFired = now;
     player.ammo--;
     
+    // Play sound
+    this.playShootSound();
+    
     // Raycast to find hit - pass player.id to avoid self-hit
     const hit = this.raycast(player.x, player.y, player.angle, weapon.range, player.id);
     
@@ -538,6 +541,12 @@ class GunFightHost {
     message.className = 'game-message';
     message.textContent = winner ? `🏆 ${winner.name} WINS! 🏆` : 'GAME OVER';
     gameHud.appendChild(message);
+
+    // Notify players
+    this.channel.publish('game-over', {
+      winnerId: winner ? winner.id : null,
+      winnerName: winner ? winner.name : null
+    });
   }
   
   generateArena() {
@@ -626,6 +635,28 @@ class GunFightHost {
     const dy = player.y - closestY;
     
     return (dx * dx + dy * dy) < (radius * radius);
+  }
+
+  playShootSound() {
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const oscillator = this.audioCtx.createOscillator();
+    const gainNode = this.audioCtx.createGain();
+    
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(150, this.audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(40, this.audioCtx.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.05, this.audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.1);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(this.audioCtx.currentTime + 0.1);
   }
   
   render() {

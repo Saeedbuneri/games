@@ -129,36 +129,40 @@
     .controls {
       flex: 1;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-around;
       gap: 20px;
     }
 
-    .dpad {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      justify-content: center;
-    }
-
-    .dpad-btn {
-      flex: 1;
-      border: none;
-      border-radius: 15px;
-      font-size: 2em;
-      font-weight: 900;
-      color: white;
-      background: rgba(102, 126, 234, 0.3);
-      border: 3px solid rgba(102, 126, 234, 0.5);
-      cursor: pointer;
-      transition: all 0.1s;
+    .joystick-container {
+      position: relative;
+      width: 150px;
+      height: 150px;
+      background: rgba(102, 126, 234, 0.15);
+      border: 2px solid rgba(102, 126, 234, 0.4);
+      border-radius: 50%;
       touch-action: none;
-      min-height: 80px;
     }
 
-    .dpad-btn:active {
-      background: rgba(102, 126, 234, 0.6);
-      transform: scale(0.95);
+    .joystick-container.firing {
+      background: rgba(255, 0, 0, 0.2);
+      border-color: rgba(255, 0, 0, 0.6);
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+    }
+
+    .joystick-stick {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(102, 126, 234, 0.6), rgba(102, 126, 234, 0.3));
+      border: 3px solid rgba(102, 126, 234, 0.6);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.1s;
+      pointer-events: none;
     }
 
     .fire-btn {
@@ -298,18 +302,11 @@
       </div>
 
       <div class="controls">
-        <div class="dpad">
-          <button class="dpad-btn" id="btnUp">
-            ▲<br>
-            <span style="font-size: 0.5em;">UP</span>
-          </button>
-          <button class="dpad-btn" id="btnDown">
-            ▼<br>
-            <span style="font-size: 0.5em;">DOWN</span>
-          </button>
+        <div class="joystick-container" id="moveJoystick">
+          <div class="joystick-stick" id="moveStick"></div>
         </div>
 
-        <button class="fire-btn" id="btnFire">
+        <button class="fire-btn" id="btnFire" style="display: none;">
           🔥<br>
           <span style="font-size: 0.4em;">FIRE</span>
         </button>
