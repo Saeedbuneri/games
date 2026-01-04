@@ -9,6 +9,7 @@ class GunFightHost {
     // Game state
     this.players = new Map();
     this.bullets = []; // Visual bullet tracers
+    this.explosions = []; // Visual explosions
     this.gameStarted = false;
     this.gameMode = 'ffa'; // ffa, tdm, sniper, gunrace
     this.gameTime = 300; // 5 minutes in seconds
@@ -27,9 +28,9 @@ class GunFightHost {
     
     // Weapons
     this.weapons = {
-      primary: { name: 'Assault Rifle', damage: 25, fireRate: 100, range: 500, ammo: 30, maxAmmo: 120 },
-      secondary: { name: 'Pistol', damage: 35, fireRate: 200, range: 300, ammo: 15, maxAmmo: 75 },
-      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 800, range: 1000, ammo: 5, maxAmmo: 25 }
+      primary: { name: 'Assault Rifle', damage: 25, fireRate: 100, range: 500, ammo: 60, maxAmmo: 240 },
+      secondary: { name: 'Pistol', damage: 35, fireRate: 200, range: 300, ammo: 30, maxAmmo: 150 },
+      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 800, range: 1000, ammo: 10, maxAmmo: 50 }
     };
     
     this.init();
@@ -152,6 +153,7 @@ class GunFightHost {
       this.players.set(playerId, player);
       console.log('Player added to map. Total players:', this.players.size);
       this.updatePlayerList();
+      this.updateScoreboard();
       
       // Enable start button if we have players
       if (this.players.size > 0) {
@@ -263,8 +265,8 @@ class GunFightHost {
     player.lastFired = now;
     player.ammo--;
     
-    // Raycast to find hit
-    const hit = this.raycast(player.x, player.y, player.angle, weapon.range);
+    // Raycast to find hit - pass player.id to avoid self-hit
+    const hit = this.raycast(player.x, player.y, player.angle, weapon.range, player.id);
     
     // Create bullet tracer for visual effect
     const endX = player.x + Math.cos(player.angle) * weapon.range;
@@ -292,36 +294,56 @@ class GunFightHost {
     this.updatePlayerState(player);
   }
   
-  raycast(x, y, angle, range) {
+  raycast(x, y, angle, range, firingPlayerId) {
     const endX = x + Math.cos(angle) * range;
     const endY = y + Math.sin(angle) * range;
     
-    // Check for player hits
     let closestHit = null;
     let closestDist = range;
     
     for (const [id, targetPlayer] of this.players) {
       if (targetPlayer.health <= 0) continue;
       
-      // Simple circle collision for players
-      const dx = targetPlayer.x - x;
-      const dy = targetPlayer.y - y;
-      const distToPlayer = Math.sqrt(dx * dx + dy * dy);
+      // Don't hit yourself
+      if (id === firingPlayerId) continue;
+
+      // Distance from point (targetPlayer) to line segment (x,y to endX,endY)
+      const dist = this.distToSegment(targetPlayer.x, targetPlayer.y, x, y, endX, endY);
       
-      // Check if player is in line of fire
-      const angleToPlayer = Math.atan2(dy, dx);
-      const angleDiff = Math.abs(angle - angleToPlayer);
-      
-      if (angleDiff < 0.1 && distToPlayer < closestDist) {
-        closestHit = { player: targetPlayer, distance: distToPlayer };
-        closestDist = distToPlayer;
+      if (dist < 25) { // Player radius + small buffer
+        const dX = targetPlayer.x - x;
+        const dY = targetPlayer.y - y;
+        const distToPlayer = Math.sqrt(dX * dX + dY * dY);
+        
+        if (distToPlayer < closestDist) {
+          closestHit = { player: targetPlayer, distance: distToPlayer };
+          closestDist = distToPlayer;
+        }
       }
     }
     
     return closestHit;
   }
+
+  distToSegment(px, py, x1, y1, x2, y2) {
+    const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+    if (l2 === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+    let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.sqrt((px - (x1 + t * (x2 - x1))) ** 2 + (py - (y1 + t * (y2 - y1))) ** 2);
+  }
   
   damagePlayer(player, damage, attacker) {
+    // Don't damage yourself with bullets (grenades might still hit you)
+    if (player.id === attacker.id && damage < 50) { // Bullets do < 50, grenades do more
+      return;
+    }
+
+    // Friendly fire check
+    if (this.gameMode === 'tdm' && player.team === attacker.team) {
+      return;
+    }
+
     player.health -= damage;
     
     // Show hit marker to attacker
@@ -385,12 +407,21 @@ class GunFightHost {
     // Create grenade explosion area
     const explosionRadius = 150;
     
+    // Add visual explosion
+    this.explosions.push({
+      x: player.x + Math.cos(player.angle) * 100, // Throw it forward a bit
+      y: player.y + Math.sin(player.angle) * 100,
+      radius: explosionRadius,
+      time: Date.now()
+    });
+
+    const expX = player.x + Math.cos(player.angle) * 100;
+    const expY = player.y + Math.sin(player.angle) * 100;
+    
     // Damage players in radius
     for (const [id, targetPlayer] of this.players) {
-      if (targetPlayer.id === player.id) continue;
-      
-      const dx = targetPlayer.x - player.x;
-      const dy = targetPlayer.y - player.y;
+      const dx = targetPlayer.x - expX;
+      const dy = targetPlayer.y - expY;
       const dist = Math.sqrt(dx * dx + dy * dy);
       
       if (dist < explosionRadius) {
@@ -425,6 +456,9 @@ class GunFightHost {
       kills: player.kills,
       deaths: player.deaths
     });
+    
+    // Update host UI
+    this.updateScoreboard();
   }
   
   updatePlayerList() {
@@ -526,9 +560,6 @@ class GunFightHost {
     // Render game
     this.render();
     
-    // Update scoreboard
-    this.updateScoreboard();
-    
     // Continue loop
     requestAnimationFrame(() => this.gameLoop());
   }
@@ -537,34 +568,54 @@ class GunFightHost {
     // Remove old bullet tracers (keep for 100ms)
     const now = Date.now();
     this.bullets = this.bullets.filter(bullet => now - bullet.time < 100);
+    this.explosions = this.explosions.filter(exp => now - exp.time < 500);
     
     // Update all players
     for (const [id, player] of this.players) {
-      // Update position
+      if (player.health <= 0) continue;
+
+      // Try moving in X
+      const oldX = player.x;
       player.x += player.vx;
-      player.y += player.vy;
       
-      // Keep in bounds
-      player.x = Math.max(50, Math.min(this.arena.width - 50, player.x));
-      player.y = Math.max(50, Math.min(this.arena.height - 50, player.y));
+      // Keep in bounds X
+      player.x = Math.max(20, Math.min(this.arena.width - 20, player.x));
       
-      // Check collision with obstacles
+      // Check collision with obstacles in X
       for (const obstacle of this.arena.obstacles) {
         if (this.checkCollision(player, obstacle)) {
-          // Push player out
-          player.x -= player.vx;
-          player.y -= player.vy;
+          player.x = oldX;
+          break;
+        }
+      }
+
+      // Try moving in Y
+      const oldY = player.y;
+      player.y += player.vy;
+      
+      // Keep in bounds Y
+      player.y = Math.max(20, Math.min(this.arena.height - 20, player.y));
+      
+      // Check collision with obstacles in Y
+      for (const obstacle of this.arena.obstacles) {
+        if (this.checkCollision(player, obstacle)) {
+          player.y = oldY;
+          break;
         }
       }
     }
   }
   
   checkCollision(player, obstacle) {
-    const playerSize = 30;
-    return player.x < obstacle.x + obstacle.width &&
-           player.x + playerSize > obstacle.x &&
-           player.y < obstacle.y + obstacle.height &&
-           player.y + playerSize > obstacle.y;
+    const radius = 20;
+    // Closest point on rectangle to circle center
+    const closestX = Math.max(obstacle.x, Math.min(player.x, obstacle.x + obstacle.width));
+    const closestY = Math.max(obstacle.y, Math.min(player.y, obstacle.y + obstacle.height));
+    
+    const dx = player.x - closestX;
+    const dy = player.y - closestY;
+    
+    return (dx * dx + dy * dy) < (radius * radius);
   }
   
   render() {
@@ -585,17 +636,38 @@ class GunFightHost {
       camY = firstPlayer.y;
     }
     
+    // Clamp camera to arena bounds to prevent showing "the void"
+    const halfWidth = canvas.width / 2;
+    const halfHeight = canvas.height / 2;
+    
+    // Only clamp if arena is larger than canvas
+    if (this.arena.width > canvas.width) {
+      camX = Math.max(halfWidth, Math.min(this.arena.width - halfWidth, camX));
+    } else {
+      camX = this.arena.width / 2;
+    }
+    
+    if (this.arena.height > canvas.height) {
+      camY = Math.max(halfHeight, Math.min(this.arena.height - halfHeight, camY));
+    } else {
+      camY = this.arena.height / 2;
+    }
+    
     // Transform to world space
     ctx.save();
     ctx.translate(canvas.width / 2 - camX, canvas.height / 2 - camY);
     
-    // Draw arena border
-    ctx.strokeStyle = '#444';
-    ctx.lineWidth = 5;
-    ctx.strokeRect(0, 0, this.arena.width, this.arena.height);
+    // Draw arena floor
+    ctx.fillStyle = '#16213e';
+    ctx.fillRect(0, 0, this.arena.width, this.arena.height);
+
+    // Draw arena border (Solid walls)
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(-5, -5, this.arena.width + 10, this.arena.height + 10);
     
     // Draw grid
-    ctx.strokeStyle = '#222';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     for (let x = 0; x <= this.arena.width; x += 100) {
       ctx.beginPath();
@@ -633,6 +705,23 @@ class GunFightHost {
       ctx.lineTo(bullet.endX, bullet.endY);
       ctx.stroke();
       ctx.shadowBlur = 0;
+    }
+
+    // Draw explosions
+    for (const exp of this.explosions) {
+      const age = Date.now() - exp.time;
+      const pct = age / 500;
+      const radius = exp.radius * (0.5 + pct * 0.5);
+      const opacity = 1 - pct;
+      
+      ctx.fillStyle = `rgba(255, 100, 0, ${opacity * 0.6})`;
+      ctx.beginPath();
+      ctx.arc(exp.x, exp.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.strokeStyle = `rgba(255, 200, 0, ${opacity})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
     
     // Draw players

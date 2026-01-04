@@ -11,8 +11,8 @@ class GunFightController {
     
     // Player state
     this.health = 100;
-    this.ammo = 30;
-    this.maxAmmo = 120;
+    this.ammo = 60;
+    this.maxAmmo = 240;
     this.score = 0;
     this.currentWeapon = 'primary';
     this.isCrouching = false;
