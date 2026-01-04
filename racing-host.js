@@ -159,7 +159,7 @@ class RacingGame {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     
-    this.raceDistance = 1000; // Distance to finish line
+    this.raceDistance = 3000; // Distance to finish line
     this.racers = [];
     this.raceStartTime = 0;
     this.raceActive = false;
@@ -211,7 +211,7 @@ class RacingGame {
           progress: 0,
           speed: 0,
           isAI: true,
-          aiSpeed: 0.15 + Math.random() * 0.15, // Random AI difficulty
+          aiSpeed: 0.05 + Math.random() * 0.08, // Random AI difficulty
           tapCount: 0,
           finished: false,
           finishTime: 0,
@@ -253,7 +253,7 @@ class RacingGame {
     const racer = this.racers.find(r => r.id === data.playerId);
     if (racer && !racer.finished && this.raceActive) {
       racer.tapCount++;
-      racer.speed = Math.min(racer.speed + 2, 8); // Increase speed with tap
+      racer.speed = Math.min(racer.speed + 0.5, 3); // Increase speed with tap
     }
   }
   
@@ -273,8 +273,8 @@ class RacingGame {
         racer.speed = racer.aiSpeed + Math.sin(Date.now() / 1000) * 0.02;
         racer.tapCount += racer.aiSpeed * 5;
       } else {
-        // Player - decay speed
-        racer.speed = Math.max(racer.speed * 0.98, 0);
+        // Player - decay speed faster to require consistent tapping
+        racer.speed = Math.max(racer.speed * 0.92, 0);
       }
       
       racer.progress += racer.speed;
