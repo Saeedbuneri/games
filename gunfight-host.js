@@ -193,7 +193,7 @@ class GunFightHost {
   }
   
   handleMove(player, data) {
-    const speed = player.isCrouching ? 3 : 6;
+    const speed = player.isCrouching ? 2 : 4.5;
     const deadzone = 0.2; // Increased deadzone for better control
     
     // Check if joystick is not active or input is too small
