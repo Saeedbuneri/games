@@ -28,8 +28,9 @@ class Controller {
       gyro: { alpha: 0, beta: 0, gamma: 0 }
     };
     
+    this.previousAccel = { x: 0, y: 0, z: 0 };
     this.lastSwingTime = 0;
-    this.swingCooldown = 300;
+    this.swingCooldown = 500;
     
     this.init();
     this.setupDisconnectHandler();
@@ -348,7 +349,10 @@ class Controller {
   }
   
   processSensorData() {
-    const alpha = 0.7;
+    const alpha = 0.8; // More aggressive filtering to reduce noise
+    
+    // Store previous smoothed values for spike detection
+    this.previousAccel = { ...this.smoothed.accel };
     
     this.smoothed.accel.x = Utils.lowPassFilter(
       this.sensors.acceleration.x - this.baseline.accel.x,
@@ -393,8 +397,19 @@ class Controller {
       this.smoothed.accel.z
     );
     
-    // Increased threshold to prevent accidental swings
-    if (speed > 8) {
+    // Calculate acceleration change (spike detection)
+    const accelChange = Utils.magnitude(
+      this.smoothed.accel.x - this.previousAccel.x,
+      this.smoothed.accel.y - this.previousAccel.y,
+      this.smoothed.accel.z - this.previousAccel.z
+    );
+    
+    // Higher threshold and require significant acceleration change
+    // This ensures actual deliberate swinging motion, not just phone movement
+    const SWING_THRESHOLD = 12; // Increased from 8 to require more force
+    const SPIKE_THRESHOLD = 3; // Require sudden acceleration change
+    
+    if (speed > SWING_THRESHOLD && accelChange > SPIKE_THRESHOLD) {
       this.lastSwingTime = now;
       this.sendSwing(speed);
     }

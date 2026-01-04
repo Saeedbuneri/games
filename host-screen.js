@@ -11,6 +11,7 @@ class HostScreen {
     this.lastFrameTime = Date.now();
     this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
     this.particles = [];
+    this.gameMode = 'pvp'; // pvp or bot
     
     this.init();
   }
@@ -205,16 +206,33 @@ class HostScreen {
   
   updateStartButton() {
     const button = document.getElementById('startButton');
-    const canStart = this.players.size >= 2;
+    const requirement = document.getElementById('playerRequirement');
+    const canStart = this.gameMode === 'bot' 
+      ? this.players.size >= 1 
+      : this.players.size >= 2;
     
     button.disabled = !canStart;
     
-    console.log('Updating start button. Players:', this.players.size, 'Can start:', canStart);
+    console.log('Updating start button. Players:', this.players.size, 'Mode:', this.gameMode, 'Can start:', canStart);
     
     if (canStart) {
-      button.textContent = `🚀 START GAME (${this.players.size} Players)`;
+      if (this.gameMode === 'bot') {
+        button.textContent = `🚀 START GAME vs AI (${this.players.size} Player)`;
+      } else {
+        button.textContent = `🚀 START GAME (${this.players.size} Players)`;
+      }
     } else {
-      button.textContent = `⏳ Waiting for Players (${this.players.size}/2)`;
+      const required = this.gameMode === 'bot' ? 1 : 2;
+      button.textContent = `⏳ Waiting for Players (${this.players.size}/${required})`;
+    }
+    
+    // Update requirement text
+    if (requirement) {
+      if (this.gameMode === 'bot') {
+        requirement.textContent = 'Need at least 1 player to start (vs AI Bot)';
+      } else {
+        requirement.textContent = 'Need at least 2 players to start';
+      }
     }
   }
   
@@ -248,6 +266,26 @@ class HostGame {
       }
     });
     
+    // Add AI bot if in bot mode and only 1 player
+    if (this.host.gameMode === 'bot' && index === 1) {
+      const botId = 'bot-player';
+      this.gameState.addPlayer(botId);
+      const botPlayer = this.gameState.players.get(botId);
+      botPlayer.name = 'AI Bot 🤖';
+      botPlayer.isBot = true;
+      
+      // Update UI for bot
+      document.getElementById(`player${index + 1}Name`).textContent = 'AI Bot 🤖';
+      
+      // Initialize bot AI state
+      botPlayer.aiState = {
+        targetY: this.host.canvas.height / 2,
+        reactionTime: 0,
+        difficulty: 0.7, // 0-1, higher is harder
+        lastDecision: 0
+      };
+    }
+    
     // Notify players game started
     this.host.channel.publish('gameStarted', {
       timestamp: Date.now()
@@ -279,6 +317,9 @@ class HostGame {
     if (event && event.type === 'score') {
       this.handleScore(event);
     }
+    
+    // Update bot AI
+    this.updateBotAI(deltaTime);
     
     // Update screen shake
     if (this.screenShake.duration > 0) {
@@ -485,6 +526,80 @@ class HostGame {
     });
   }
   
+  updateBotAI(deltaTime) {
+    // Find bot player
+    let botPlayer = null;
+    let botPlayerId = null;
+    
+    this.gameState.players.forEach((player, id) => {
+      if (player.isBot) {
+        botPlayer = player;
+        botPlayerId = id;
+      }
+    });
+    
+    if (!botPlayer || !this.gameState.gameActive) return;
+    
+    const dt = deltaTime / 1000;
+    const shuttlecock = this.gameState.shuttlecock;
+    const ai = botPlayer.aiState;
+    
+    // Update reaction time
+    ai.reactionTime += dt;
+    
+    // Predict shuttlecock trajectory if it's coming toward bot
+    const isShuttleCockComingToBot = shuttlecock.vy > 0;
+    
+    if (isShuttleCockComingToBot && ai.reactionTime > 0.2) {
+      // Calculate where shuttlecock will land
+      const timeToLand = (this.host.canvas.height - 100 - shuttlecock.y) / Math.max(shuttlecock.vy, 1);
+      const predictedX = shuttlecock.x + shuttlecock.vx * timeToLand;
+      
+      // Add some randomness based on difficulty (lower difficulty = more error)
+      const errorMargin = (1 - ai.difficulty) * 150;
+      const error = (Math.random() - 0.5) * errorMargin;
+      
+      ai.targetY = Math.max(100, Math.min(this.host.canvas.height - 100, predictedX + error));
+      ai.anticipation = timeToLand;
+    } else {
+      // Return to center when not chasing
+      ai.targetY = this.host.canvas.height / 2;
+    }
+    
+    // Decide when to swing
+    const distanceToShuttle = Math.abs(shuttlecock.x - botPlayer.position);
+    const shuttleInRange = distanceToShuttle < 80 && shuttlecock.y > this.host.canvas.height - 200;
+    
+    if (shuttleInRange && isShuttleCockComingToBot && ai.reactionTime > 0.3) {
+      // Bot swings!
+      const swingSpeed = 12 + Math.random() * ai.difficulty * 8; // Speed based on difficulty
+      const swingType = swingSpeed > 16 ? 'smash' : 'normal';
+      
+      // Simulate swing
+      this.handleSwing({
+        playerId: botPlayerId,
+        speed: swingSpeed,
+        type: swingType,
+        angle: 'neutral',
+        rotation: 0,
+        timestamp: Date.now()
+      });
+      
+      // Reset reaction time
+      ai.reactionTime = 0;
+    }
+    
+    // Move bot toward target position
+    const movementSpeed = 400 * ai.difficulty; // Faster movement at higher difficulty
+    const diff = ai.targetY - botPlayer.position;
+    
+    if (Math.abs(diff) > 10) {
+      const moveAmount = Math.sign(diff) * movementSpeed * dt;
+      botPlayer.position += moveAmount;
+      botPlayer.position = Math.max(100, Math.min(this.host.canvas.width - 100, botPlayer.position));
+    }
+  }
+  
   handleScore(event) {
     document.getElementById('score1').textContent = this.gameState.score.player1;
     document.getElementById('score2').textContent = this.gameState.score.player2;
@@ -515,9 +630,14 @@ window.addEventListener('load', () => {
 });
 
 function startGame() {
-  // Check if enough players
-  if (hostScreen.players.size < 2) {
-    alert('Need at least 2 players to start!');
+  // Check if enough players based on mode
+  const canStart = hostScreen.gameMode === 'bot' 
+    ? hostScreen.players.size >= 1 
+    : hostScreen.players.size >= 2;
+    
+  if (!canStart) {
+    const required = hostScreen.gameMode === 'bot' ? '1 player' : '2 players';
+    alert(`Need at least ${required} to start!`);
     return;
   }
   
@@ -632,4 +752,17 @@ function quitBadmintonToMenu() {
     hostScreen.updatePlayerList();
     hostScreen.updateStartButton();
   }
+}
+
+function selectBadmintonMode(mode) {
+  if (!hostScreen) return;
+  
+  hostScreen.gameMode = mode;
+  
+  // Update UI
+  document.getElementById('badmintonModePvP').classList.toggle('selected', mode === 'pvp');
+  document.getElementById('badmintonModeBot').classList.toggle('selected', mode === 'bot');
+  
+  // Update start button requirements
+  hostScreen.updateStartButton();
 }
