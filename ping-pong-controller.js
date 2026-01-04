@@ -6,6 +6,8 @@ class PingPongController {
     this.channel = null;
     this.playerId = 'player-' + Math.random().toString(36).substr(2, 9);
     this.side = null;
+    this.lastInputTime = 0;
+    this.inputThrottle = 50; // ms
     
     this.init();
   }
@@ -47,6 +49,12 @@ class PingPongController {
       document.getElementById('scoreDisplay').textContent = `${msg.data.s1} - ${msg.data.s2}`;
       if (navigator.vibrate) navigator.vibrate(50);
     });
+
+    this.channel.subscribe('paddle-hit', (msg) => {
+      if (msg.data.side === this.side && navigator.vibrate) {
+        navigator.vibrate(30);
+      }
+    });
     
     this.channel.publish('player-joined', { playerId: this.playerId });
     this.showScreen('waitingScreen');
@@ -56,12 +64,13 @@ class PingPongController {
     const area = document.getElementById('touchArea');
     const handle = document.getElementById('handle');
     
-    const handleTouch = (e) => {
-      e.preventDefault();
-      const touch = e.touches ? e.touches[0] : e;
+    const handleTouch = (e, isEnd = false) => {
+      if (!isEnd) e.preventDefault();
+      
+      const touch = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
       const rect = area.getBoundingClientRect();
       
-      // Calculate normalized Y (-1 to 1)
+      // Calculate normalized Y (0 to 1)
       let y = (touch.clientY - rect.top) / rect.height;
       y = Math.max(0, Math.min(1, y));
       
@@ -71,18 +80,27 @@ class PingPongController {
       
       // Send to host (normalized -1 to 1)
       if (this.channel) {
+        const now = Date.now();
+        // Throttle updates, but always send the first and last touch
+        if (!isEnd && now - this.lastInputTime < this.inputThrottle) return;
+        this.lastInputTime = now;
+
         this.channel.publish('controller-input', {
           playerId: this.playerId,
-          y: (y * 2) - 1
+          y: (y * 2) - 1,
+          timestamp: now
         });
       }
     };
     
-    area.addEventListener('touchstart', handleTouch);
-    area.addEventListener('touchmove', handleTouch);
+    area.addEventListener('touchstart', (e) => handleTouch(e));
+    area.addEventListener('touchmove', (e) => handleTouch(e));
+    area.addEventListener('touchend', (e) => handleTouch(e, true));
+    
     area.addEventListener('mousedown', (e) => {
       const move = (me) => handleTouch(me);
-      const up = () => {
+      const up = (ue) => {
+        handleTouch(ue, true);
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', up);
       };

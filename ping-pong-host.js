@@ -139,9 +139,9 @@ class PingPongHost {
   }
   
   update() {
-    // Smooth paddle movement
-    this.p1.y += (this.p1.targetY - this.p1.y) * 0.2;
-    this.p2.y += (this.p2.targetY - this.p2.y) * 0.2;
+    // Smooth paddle movement - increased factor for faster response
+    this.p1.y += (this.p1.targetY - this.p1.y) * 0.4;
+    this.p2.y += (this.p2.targetY - this.p2.y) * 0.4;
     
     // Ball movement
     this.ball.x += this.ball.vx;
@@ -160,6 +160,7 @@ class PingPongHost {
         // Add spin based on where it hit the paddle
         const hitPos = (this.ball.y - (this.p1.y + this.paddleHeight / 2)) / (this.paddleHeight / 2);
         this.ball.vy += hitPos * 2;
+        this.channel.publish('paddle-hit', { side: 'left' });
       } else if (this.ball.x < 0) {
         this.score2++;
         this.updateScore();
@@ -174,6 +175,7 @@ class PingPongHost {
         this.ball.x = this.canvas.width - this.paddleWidth - this.ballSize;
         const hitPos = (this.ball.y - (this.p2.y + this.paddleHeight / 2)) / (this.paddleHeight / 2);
         this.ball.vy += hitPos * 2;
+        this.channel.publish('paddle-hit', { side: 'right' });
       } else if (this.ball.x > this.canvas.width) {
         this.score1++;
         this.updateScore();
