@@ -169,80 +169,156 @@ class Racing3DGame {
   }
   
   setupScene() {
-    // Sky
+    // Sky gradient
     this.scene.background = new THREE.Color(0x87CEEB);
-    this.scene.fog = new THREE.Fog(0x87CEEB, 100, 500);
+    this.scene.fog = new THREE.Fog(0x87CEEB, 200, 800);
     
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambientLight);
     
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    sunLight.position.set(50, 100, 50);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+    sunLight.position.set(100, 150, 100);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.left = -150;
+    sunLight.shadow.camera.right = 150;
+    sunLight.shadow.camera.top = 150;
+    sunLight.shadow.camera.bottom = -150;
     this.scene.add(sunLight);
     
-    // Ground
-    const groundGeometry = new THREE.PlaneGeometry(500, 500);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.8 });
+    // Large ground plane
+    const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x228B22, 
+      roughness: 0.9,
+      metalness: 0.1
+    });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.5;
+    ground.position.y = -1;
     ground.receiveShadow = true;
     this.scene.add(ground);
     
-    // Camera position
-    this.camera.position.set(0, 80, -80);
-    this.camera.lookAt(0, 0, 50);
+    // Camera setup - bird's eye view following race
+    this.camera.position.set(0, 120, -100);
+    this.camera.lookAt(0, 0, 0);
   }
   
   createTrack() {
-    // Main track (oval)
-    const trackGeometry = new THREE.PlaneGeometry(this.trackWidth, this.trackLength);
-    const trackMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    // Create oval track with curves
+    this.trackCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, -100),
+      new THREE.Vector3(80, 0, -80),
+      new THREE.Vector3(100, 0, 0),
+      new THREE.Vector3(80, 0, 80),
+      new THREE.Vector3(0, 0, 100),
+      new THREE.Vector3(-80, 0, 80),
+      new THREE.Vector3(-100, 0, 0),
+      new THREE.Vector3(-80, 0, -80),
+      new THREE.Vector3(0, 0, -100)
+    ], true);
+    
+    this.trackPoints = this.trackCurve.getPoints(200);
+    this.trackLength = 200;
+    
+    // Create track mesh
+    const trackShape = new THREE.Shape();
+    trackShape.moveTo(-this.trackWidth / 2, 0);
+    trackShape.lineTo(this.trackWidth / 2, 0);
+    trackShape.lineTo(this.trackWidth / 2, 1);
+    trackShape.lineTo(-this.trackWidth / 2, 1);
+    
+    const extrudeSettings = {
+      steps: 200,
+      bevelEnabled: false,
+      extrudePath: this.trackCurve
+    };
+    
+    const trackGeometry = new THREE.ExtrudeGeometry(trackShape, extrudeSettings);
+    const trackMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x444444,
+      roughness: 0.7,
+      metalness: 0.3
+    });
     const track = new THREE.Mesh(trackGeometry, trackMaterial);
-    track.rotation.x = -Math.PI / 2;
     track.receiveShadow = true;
     this.scene.add(track);
     
-    // Lane markings
-    for (let i = 1; i < 8; i++) {
-      const laneX = -this.trackWidth / 2 + (this.trackWidth / 8) * i;
-      const lineGeometry = new THREE.BoxGeometry(0.2, 0.1, this.trackLength);
-      const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-      const line = new THREE.Mesh(lineGeometry, lineMaterial);
-      line.position.set(laneX, 0, 0);
-      this.scene.add(line);
-    }
+    // Add barriers on both sides
+    this.createBarriers();
     
-    // Start/Finish line
-    const finishGeometry = new THREE.BoxGeometry(this.trackWidth, 0.2, 2);
-    const finishMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    // Add start/finish line
+    const finishGeometry = new THREE.BoxGeometry(this.trackWidth, 0.5, 5);
+    const finishMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.3
+    });
     const finishLine = new THREE.Mesh(finishGeometry, finishMaterial);
-    finishLine.position.set(0, 0.1, -this.trackLength / 2 + 5);
+    finishLine.position.copy(this.trackPoints[0]);
+    finishLine.position.y = 0.5;
     this.scene.add(finishLine);
     
-    // Checkered pattern on finish line
+    // Add checkered pattern
     for (let i = 0; i < 10; i++) {
       const checker = new THREE.Mesh(
-        new THREE.BoxGeometry(this.trackWidth / 10, 0.3, 2),
-        new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x000000 : 0xffffff })
+        new THREE.BoxGeometry(this.trackWidth / 10, 0.6, 5),
+        new THREE.MeshStandardMaterial({ 
+          color: i % 2 === 0 ? 0x000000 : 0xffffff,
+          emissive: i % 2 === 0 ? 0x000000 : 0xffffff,
+          emissiveIntensity: 0.2
+        })
       );
-      checker.position.set(-this.trackWidth / 2 + (this.trackWidth / 10) * i + this.trackWidth / 20, 0.1, -this.trackLength / 2 + 5);
+      checker.position.copy(this.trackPoints[0]);
+      checker.position.x += (-this.trackWidth / 2) + (this.trackWidth / 10) * i + (this.trackWidth / 20);
+      checker.position.y = 0.6;
       this.scene.add(checker);
+    }
+  }
+  
+  createBarriers() {
+    // Create barriers along the track
+    const barrierGeometry = new THREE.BoxGeometry(2, 5, 2);
+    const barrierMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xff0000,
+      emissive: 0xff0000,
+      emissiveIntensity: 0.2
+    });
+    
+    for (let i = 0; i < this.trackPoints.length; i += 5) {
+      const point = this.trackPoints[i];
+      const nextPoint = this.trackPoints[(i + 1) % this.trackPoints.length];
+      const direction = new THREE.Vector3().subVectors(nextPoint, point).normalize();
+      const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
+      
+      // Inner barrier
+      const innerBarrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
+      innerBarrier.position.copy(point);
+      innerBarrier.position.add(perpendicular.clone().multiplyScalar(-this.trackWidth / 2 - 2));
+      innerBarrier.position.y = 2.5;
+      innerBarrier.castShadow = true;
+      this.scene.add(innerBarrier);
+      
+      // Outer barrier
+      const outerBarrier = new THREE.Mesh(barrierGeometry, barrierMaterial.clone());
+      outerBarrier.material.color.set(0xffff00);
+      outerBarrier.material.emissive.set(0xffff00);
+      outerBarrier.position.copy(point);
+      outerBarrier.position.add(perpendicular.clone().multiplyScalar(this.trackWidth / 2 + 2));
+      outerBarrier.position.y = 2.5;
+      outerBarrier.castShadow = true;
+      this.scene.add(outerBarrier);
     }
   }
   
   initRacers() {
     let laneIndex = 0;
-    const laneWidth = this.trackWidth / 8;
     
     // Add human players
     this.host.players.forEach((player, playerId) => {
-      const laneX = -this.trackWidth / 2 + laneWidth * laneIndex + laneWidth / 2;
-      this.racers.push(this.createCar(playerId, player.name, player.color, laneX, laneIndex));
+      this.racers.push(this.createCar(playerId, player.name, player.color, laneIndex));
       laneIndex++;
     });
     
@@ -250,39 +326,66 @@ class Racing3DGame {
     if (this.host.gameMode === 'ai') {
       const carColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xff8800, 0x8800ff];
       while (laneIndex < 8) {
-        const laneX = -this.trackWidth / 2 + laneWidth * laneIndex + laneWidth / 2;
         this.racers.push(this.createCar(
           'ai-' + laneIndex,
           `AI ${laneIndex + 1}`,
           carColors[laneIndex],
-          laneX,
           laneIndex,
           true,
-          0.3 + Math.random() * 0.3
+          0.8 + Math.random() * 0.6
         ));
         laneIndex++;
       }
     }
   }
   
-  createCar(id, name, color, laneX, laneIndex, isAI = false, aiSpeed = 0) {
+  createCar(id, name, color, laneIndex, isAI = false, aiSpeed = 0) {
     const carGroup = new THREE.Group();
     
-    // Car body
-    const bodyGeometry = new THREE.BoxGeometry(3, 1.5, 5);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: color, metalness: 0.6, roughness: 0.4 });
+    // Car body (more detailed)
+    const bodyGeometry = new THREE.BoxGeometry(4, 2, 7);
+    const bodyMaterial = new THREE.MeshStandardMaterial({ 
+      color: color, 
+      metalness: 0.8, 
+      roughness: 0.3
+    });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 1.5;
     body.castShadow = true;
     carGroup.add(body);
     
-    // Wheels
-    const wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16);
-    const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    // Roof
+    const roofGeometry = new THREE.BoxGeometry(3.5, 1.5, 4);
+    const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
+    roof.position.y = 3;
+    roof.castShadow = true;
+    carGroup.add(roof);
+    
+    // Windows
+    const windowMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x111111,
+      metalness: 0.9,
+      roughness: 0.1,
+      transparent: true,
+      opacity: 0.7
+    });
+    const windowGeometry = new THREE.BoxGeometry(3.4, 1.4, 3.9);
+    const windows = new THREE.Mesh(windowGeometry, windowMaterial);
+    windows.position.y = 3;
+    carGroup.add(windows);
+    
+    // Wheels (bigger and more visible)
+    const wheelGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.8, 16);
+    const wheelMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x000000,
+      metalness: 0.5,
+      roughness: 0.7
+    });
     const wheelPositions = [
-      [-1.2, -0.5, 1.5],
-      [1.2, -0.5, 1.5],
-      [-1.2, -0.5, -1.5],
-      [1.2, -0.5, -1.5]
+      [-2, 0.8, 2.5],
+      [2, 0.8, 2.5],
+      [-2, 0.8, -2.5],
+      [2, 0.8, -2.5]
     ];
     
     wheelPositions.forEach(pos => {
@@ -293,7 +396,24 @@ class Racing3DGame {
       carGroup.add(wheel);
     });
     
-    carGroup.position.set(laneX, 1, -this.trackLength / 2 + 10);
+    // Headlights
+    const headlightGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+    const headlightMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xffff00,
+      emissive: 0xffff00,
+      emissiveIntensity: 1
+    });
+    [-1.5, 1.5].forEach(x => {
+      const light = new THREE.Mesh(headlightGeometry, headlightMaterial);
+      light.position.set(x, 1.5, 3.7);
+      carGroup.add(light);
+    });
+    
+    // Start position on track
+    const startPoint = this.trackPoints[laneIndex * 3];
+    carGroup.position.copy(startPoint);
+    carGroup.position.y = 0;
+    
     this.scene.add(carGroup);
     
     return {
@@ -301,13 +421,12 @@ class Racing3DGame {
       name,
       mesh: carGroup,
       lane: laneIndex,
-      laneX,
       speed: 0,
-      position: 0,
+      trackPosition: laneIndex * 3,
       lap: 1,
       isAI,
       aiSpeed,
-      steering: 0,
+      lastCheckpoint: 0,
       finished: false,
       finishTime: 0
     };
@@ -348,8 +467,7 @@ class Racing3DGame {
   handleRacerControl(data) {
     const racer = this.racers.find(r => r.id === data.playerId);
     if (racer && !racer.finished && this.raceActive) {
-      racer.steering = data.steering; // -1 to 1
-      racer.speed = Math.max(0, Math.min(data.speed, 2)); // 0 to 2
+      racer.speed = Math.max(0, Math.min(data.speed * 1.5, 3)); // 0 to 3
     }
   }
   
@@ -363,28 +481,16 @@ class Racing3DGame {
       allFinished = false;
       
       if (racer.isAI) {
-        // AI control
-        racer.speed = racer.aiSpeed;
-        racer.steering = (Math.sin(Date.now() / 1000) * 0.1);
+        // AI control with slight variation
+        racer.speed = racer.aiSpeed + Math.sin(Date.now() / 2000) * 0.1;
       }
       
-      // Update position
-      racer.position += racer.speed;
-      const zPos = -this.trackLength / 2 + 10 + racer.position;
+      // Move along track
+      racer.trackPosition += racer.speed;
       
-      // Apply steering (with bounds)
-      const targetX = racer.laneX + racer.steering * 2;
-      const minX = -this.trackWidth / 2 + 2;
-      const maxX = this.trackWidth / 2 - 2;
-      racer.mesh.position.x = Math.max(minX, Math.min(maxX, targetX));
-      racer.mesh.position.z = zPos;
-      
-      // Rotation for steering effect
-      racer.mesh.rotation.y = -racer.steering * 0.3;
-      
-      // Check lap completion
-      if (racer.position >= this.trackLength - 20) {
-        racer.position = 0;
+      // Wrap around track
+      if (racer.trackPosition >= this.trackLength) {
+        racer.trackPosition -= this.trackLength;
         racer.lap++;
         
         if (racer.lap > this.totalLaps) {
@@ -402,28 +508,78 @@ class Racing3DGame {
           });
         }
       }
+      
+      // Update car position and rotation on track
+      const currentIndex = Math.floor(racer.trackPosition);
+      const nextIndex = (currentIndex + 1) % this.trackLength;
+      const t = racer.trackPosition - currentIndex;
+      
+      const currentPoint = this.trackPoints[currentIndex];
+      const nextPoint = this.trackPoints[nextIndex];
+      
+      // Interpolate position
+      racer.mesh.position.lerpVectors(currentPoint, nextPoint, t);
+      racer.mesh.position.y = 0;
+      
+      // Calculate rotation to face direction of movement
+      const direction = new THREE.Vector3().subVectors(nextPoint, currentPoint).normalize();
+      const angle = Math.atan2(direction.x, direction.z);
+      racer.mesh.rotation.y = angle;
+      
+      // Tilt car slightly when turning
+      const nextNextIndex = (nextIndex + 1) % this.trackLength;
+      const nextNextPoint = this.trackPoints[nextNextIndex];
+      const nextDirection = new THREE.Vector3().subVectors(nextNextPoint, nextPoint).normalize();
+      const turnAngle = Math.atan2(nextDirection.x, nextDirection.z) - angle;
+      racer.mesh.rotation.z = -turnAngle * 0.3;
     });
     
     this.updateLeaderboard();
+    this.updateCamera();
     
     if (allFinished) {
       this.endRace();
     }
   }
   
+  updateCamera() {
+    // Dynamic camera following the leader
+    if (this.racers.length > 0) {
+      const sorted = [...this.racers].sort((a, b) => {
+        if (a.lap !== b.lap) return b.lap - a.lap;
+        return b.trackPosition - a.trackPosition;
+      });
+      
+      const leader = sorted[0];
+      if (leader) {
+        const targetPos = leader.mesh.position.clone();
+        targetPos.y = 100;
+        targetPos.z -= 80;
+        
+        // Smooth camera movement
+        this.camera.position.lerp(targetPos, 0.05);
+        this.camera.lookAt(leader.mesh.position.x, 0, leader.mesh.position.z);
+      }
+    }
+  }
+  
   updateLeaderboard() {
     const sorted = [...this.racers].sort((a, b) => {
       if (a.lap !== b.lap) return b.lap - a.lap;
-      return b.position - a.position;
+      return b.trackPosition - a.trackPosition;
     });
     
     const leaderboard = document.getElementById('leaderboard');
-    leaderboard.innerHTML = sorted.slice(0, 5).map((racer, i) => `
-      <div class="leaderboard-item">
-        <span>${i + 1}. ${racer.name}</span>
-        <span>Lap ${racer.lap}</span>
-      </div>
-    `).join('');
+    leaderboard.innerHTML = sorted.slice(0, 8).map((racer, i) => {
+      const medals = ['🥇', '🥈', '🥉'];
+      const medal = i < 3 ? medals[i] : `${i + 1}.`;
+      return `
+        <div class="leaderboard-item">
+          <span>${medal} ${racer.name}</span>
+          <span>Lap ${racer.lap}/${this.totalLaps}</span>
+        </div>
+      `;
+    }).join('');
     
     // Update lap counter for first racer
     if (sorted[0]) {
