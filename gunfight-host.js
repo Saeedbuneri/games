@@ -161,8 +161,6 @@ class GunFightHost {
     const { playerId, type, action, value, data: inputData } = data;
     const player = this.players.get(playerId);
     
-    console.log('Controller input received:', { playerId, type, action, gameStarted: this.gameStarted });
-    
     if (!player) {
       console.warn('Player not found:', playerId);
       return;
@@ -190,7 +188,6 @@ class GunFightHost {
     const speed = player.isCrouching ? 2 : 4;
     player.vx = data.x * speed;
     player.vy = data.y * speed;
-    console.log('Player movement:', { vx: player.vx, vy: player.vy, x: player.x, y: player.y });
   }
   
   handleLook(player, data) {
