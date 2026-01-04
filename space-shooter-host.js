@@ -203,10 +203,10 @@ class SpaceShooterGame {
     
     this.players = {
       left: {
-        x: 300,
+        x: 80,
         y: this.canvas.height / 2,
-        width: 120,
-        height: 180,
+        width: 60,
+        height: 90,
         health: 100,
         score: 0,
         bullets: [],
@@ -223,10 +223,10 @@ class SpaceShooterGame {
         hasPowerUp: false
       },
       right: {
-        x: this.canvas.width - 300,
+        x: this.canvas.width - 80,
         y: this.canvas.height / 2,
-        width: 120,
-        height: 180,
+        width: 60,
+        height: 90,
         health: 100,
         score: 0,
         bullets: [],
@@ -534,7 +534,7 @@ class SpaceShooterGame {
       y: player.y,
       vx: direction * 800,
       vy: 0,
-      radius: 18,
+      radius: 9,
       powerUp: player.hasPowerUp
     });
     
@@ -542,18 +542,18 @@ class SpaceShooterGame {
     if (player.hasPowerUp) {
       player.bullets.push({
         x: baseX,
-        y: player.y - 45,
+        y: player.y - 22,
         vx: direction * 800,
         vy: 0,
-        radius: 18,
+        radius: 9,
         powerUp: true
       });
       player.bullets.push({
         x: baseX,
-        y: player.y + 45,
+        y: player.y + 22,
         vx: direction * 800,
         vy: 0,
-        radius: 18,
+        radius: 9,
         powerUp: true
       });
     }
