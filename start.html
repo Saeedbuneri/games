@@ -392,6 +392,14 @@
           </div>
         </button>
         
+        <button class="role-button" onclick="openGame('racing-3d')">
+          <div class="role-icon">🏁</div>
+          <div class="role-content">
+            <div class="role-title">3D Racing</div>
+            <div class="role-desc">Tilt-to-steer 3D racing game</div>
+          </div>
+        </button>
+        
         <button class="back-button" onclick="goBack()">← Back</button>
       </div>
       
@@ -517,6 +525,8 @@
         window.location.href = 'space-shooter-host.html';
       } else if (game === 'racing') {
         window.location.href = 'racing-host.html';
+      } else if (game === 'racing-3d') {
+        window.location.href = 'racing-3d-host.html';
       }
     }
 

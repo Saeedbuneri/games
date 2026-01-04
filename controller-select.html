@@ -164,6 +164,15 @@
       <div class="arrow">→</div>
     </div>
 
+    <div class="game-card" onclick="selectGame('racing-3d')">
+      <div class="game-icon">🏁</div>
+      <div class="game-info">
+        <div class="game-title">3D Racing</div>
+        <div class="game-desc">Tilt-to-steer 3D racing game</div>
+      </div>
+      <div class="arrow">→</div>
+    </div>
+
     <button class="back-button" onclick="goHome()">← Back to Menu</button>
   </div>
 
@@ -190,6 +199,12 @@
           window.location.href = `racing-controller.html?room=${roomCode}`;
         } else {
           window.location.href = 'racing-controller.html';
+        }
+      } else if (game === 'racing-3d') {
+        if (roomCode) {
+          window.location.href = `racing-3d-controller.html?room=${roomCode}`;
+        } else {
+          window.location.href = 'racing-3d-controller.html';
         }
       }
     }

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🏎️ 3D Racing Controller</title>
+  <script src="env.js" onerror="console.log('env.js not found - will use Vercel config')"></script>
+  <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+  <script src="config.js"></script>
+  <script src="room-manager.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #codeEntryScreen, #connectionScreen, #waitingScreen, #racingScreen, #resultsScreen {
+      display: none;
+      width: 100%;
+      max-width: 600px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    #codeEntryScreen.active, #connectionScreen.active, #waitingScreen.active, #racingScreen.active, #resultsScreen.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .screen-title {
+      font-size: 2.5em;
+      font-weight: 900;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .status-text {
+      font-size: 1.3em;
+      margin: 10px 0;
+      opacity: 0.9;
+    }
+
+    .player-info {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      margin: 20px 0;
+      width: 100%;
+    }
+
+    .player-name {
+      font-size: 2em;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .input-group {
+      margin: 25px 0;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 1.1em;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 18px;
+      font-size: 2em;
+      text-align: center;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 15px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-weight: 700;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+    }
+
+    .btn {
+      padding: 18px 40px;
+      font-size: 1.2em;
+      border: none;
+      border-radius: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin: 10px 0;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .steering-wheel {
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: 8px solid #fff;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 30px auto;
+      position: relative;
+      transition: transform 0.1s;
+    }
+
+    .steering-indicator {
+      width: 80%;
+      height: 8px;
+      background: rgba(255,255,255,0.6);
+      position: absolute;
+      border-radius: 4px;
+    }
+
+    .speedometer {
+      width: 100%;
+      max-width: 400px;
+      margin: 20px 0;
+    }
+
+    .speed-display {
+      font-size: 4em;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .speed-bar-container {
+      width: 100%;
+      height: 40px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .speed-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+      width: 0%;
+      transition: width 0.2s;
+    }
+
+    .tilt-indicator {
+      font-size: 1.2em;
+      margin: 20px 0;
+      opacity: 0.8;
+    }
+
+    .countdown {
+      font-size: 8em;
+      font-weight: 900;
+      margin: 40px 0;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid #fff;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .lap-info {
+      font-size: 2em;
+      font-weight: 700;
+      margin: 20px 0;
+      padding: 20px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 15px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Room Code Entry Screen -->
+  <div id="codeEntryScreen">
+    <div class="screen-title">🏁 Join 3D Race</div>
+    <div class="player-info">
+      <div class="input-group">
+        <label>Enter Room Code</label>
+        <input type="text" id="roomCodeInput" placeholder="ABC123" maxlength="6" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" onclick="join3DRoom()">Join Race</button>
+    </div>
+    <div class="status-text" style="font-size: 1em; opacity: 0.7;">
+      Get the room code from the main screen
+    </div>
+  </div>
+
+  <!-- Connection Screen -->
+  <div id="connectionScreen" class="active">
+    <div class="screen-title">🏁 3D Racing</div>
+    <div class="status-text">Connecting to race...</div>
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Waiting Screen -->
+  <div id="waitingScreen">
+    <div class="screen-title">🏎️ Ready to Race!</div>
+    <div class="player-info">
+      <div id="playerName" class="player-name">Racer #1</div>
+      <div id="playerLane" style="font-size: 1.2em; opacity: 0.8;">Lane 1</div>
+    </div>
+    <div class="status-text">Waiting for race to start...</div>
+    <div style="font-size: 1.1em; margin: 20px 0; opacity: 0.8;">
+      🎮 Tilt phone left/right to steer<br>
+      📱 Hold upright to accelerate
+    </div>
+  </div>
+
+  <!-- Racing Screen -->
+  <div id="racingScreen">
+    <div id="raceCountdown" class="countdown">3</div>
+    
+    <div id="racingControls" style="display: none;">
+      <div class="lap-info">
+        Lap: <span id="currentLapDisplay">1</span> / 3
+      </div>
+      
+      <div class="steering-wheel" id="steeringWheel">
+        <div class="steering-indicator"></div>
+        <div style="font-size: 2em;">🏎️</div>
+      </div>
+      
+      <div class="tilt-indicator" id="tiltIndicator">
+        Tilt: 0°
+      </div>
+      
+      <div class="speedometer">
+        <div class="speed-display" id="speedDisplay">0</div>
+        <div class="speed-bar-container">
+          <div class="speed-bar" id="speedBar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Screen -->
+  <div id="resultsScreen">
+    <div class="screen-title">🏁 Race Complete!</div>
+    <div id="finishResult" class="player-info">
+      <!-- Result will be shown here -->
+    </div>
+  </div>
+
+  <script src="racing-3d-controller.js"></script>
+  <script>
+    function join3DRoom() {
+      const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+      
+      if (code.length !== 6) {
+        alert('Please enter a 6-character room code');
+        return;
+      }
+      
+      if (racing3DController) {
+        racing3DController.joinWithCode(code);
+      }
+    }
+  </script>
+</body>
+</html>
