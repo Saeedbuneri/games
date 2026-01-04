@@ -67,15 +67,13 @@ class GunFightController {
   
   async joinGame(code) {
     try {
+      console.log('Connecting to gun fight room:', code);
+      
       // Load config from Vercel environment if deployed
       await CONFIG.loadFromEnvironment();
       
       // Connect to Ably
       this.ably = new Ably.Realtime(CONFIG.ABLY_API_KEY);
-      
-      this.ably.connection.on('connected', () => {
-        console.log('Connected to Ably');
-      });
       
       // Join the room channel
       const channelName = `gunfight-${code}`;
@@ -94,10 +92,17 @@ class GunFightController {
         this.handlePlayerUpdate(message.data);
       });
       
-      // Announce player joined
-      await this.channel.publish('player-joined', {
-        playerId: this.playerId,
-        timestamp: Date.now()
+      // Wait for connection, then announce player joined
+      this.ably.connection.on('connected', () => {
+        console.log('Connected to Ably, joining room:', code);
+        
+        setTimeout(() => {
+          console.log('Sending player-joined for:', this.playerId);
+          this.channel.publish('player-joined', {
+            playerId: this.playerId,
+            timestamp: Date.now()
+          });
+        }, 500);
       });
       
       this.isConnected = true;
