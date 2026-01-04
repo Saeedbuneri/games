@@ -19,7 +19,7 @@ class PingPongController {
     
     document.getElementById('joinBtn').addEventListener('click', () => {
       const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-      if (code.length === 4) this.joinGame(code);
+      if (code.length === 6) this.joinGame(code);
     });
     
     this.setupTouch();

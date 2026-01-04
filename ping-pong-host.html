@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏓 Ping Pong - Host Screen</title>
-  <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+  <script src="env.js" onerror="this.remove()"></script>
   <script src="config.js"></script>
   <script src="room-manager.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="ably-client.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -129,6 +129,7 @@
 
   <canvas id="gameCanvas"></canvas>
 
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="ping-pong-host.js"></script>
 </body>
 </html>

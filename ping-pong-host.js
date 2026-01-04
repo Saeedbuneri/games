@@ -67,10 +67,15 @@ class PingPongHost {
     const baseUrl = window.location.origin + window.location.pathname.replace('ping-pong-host.html', '');
     const joinUrl = baseUrl + 'ping-pong-controller.html?join=' + this.roomCode;
     
-    const qr = qrcode(0, 'M');
-    qr.addData(joinUrl);
-    qr.make();
-    document.getElementById('qrCode').innerHTML = qr.createImgTag(5);
+    const qrContainer = document.getElementById('qrCode');
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, {
+      text: joinUrl,
+      width: 200,
+      height: 200,
+      colorDark: '#000000',
+      colorLight: '#ffffff'
+    });
   }
   
   async setupAbly() {
