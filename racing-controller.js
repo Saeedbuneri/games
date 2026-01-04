@@ -23,22 +23,56 @@ class RacingController {
       const urlParams = new URLSearchParams(window.location.search);
       const roomCode = urlParams.get('room');
       
-      if (!roomCode) {
-        alert('No room code provided!');
-        return;
+      if (roomCode) {
+        // Auto-join if room code is in URL
+        document.getElementById('codeEntryScreen').classList.remove('active');
+        document.getElementById('connectionScreen').classList.add('active');
+        this.roomManager.roomCode = roomCode;
+        this.playerId = 'player-' + Math.random().toString(36).substr(2, 9);
+        await this.connectToAbly();
+        this.setupControls();
+        console.log('Racing controller ready!');
+      } else {
+        // Show code entry screen
+        document.getElementById('codeEntryScreen').classList.add('active');
+        this.setupCodeEntry();
       }
-      
-      this.roomManager.roomCode = roomCode;
-      this.playerId = 'player-' + Math.random().toString(36).substr(2, 9);
-      
-      await this.connectToAbly();
-      this.setupControls();
-      
-      console.log('Racing controller ready!');
     } catch (error) {
       console.error('Init error:', error);
       alert('Failed to initialize: ' + error.message);
     }
+  }
+  
+  setupCodeEntry() {
+    const input = document.getElementById('roomCodeInput');
+    
+    // Auto-uppercase and limit to alphanumeric
+    input.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+    
+    // Allow Enter key to submit
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && input.value.length === 6) {
+        window.joinRoom();
+      }
+    });
+    
+    // Focus the input
+    setTimeout(() => input.focus(), 100);
+  }
+  
+  async joinWithCode(code) {
+    document.getElementById('codeEntryScreen').classList.remove('active');
+    document.getElementById('connectionScreen').classList.add('active');
+    
+    this.roomManager.roomCode = code;
+    this.playerId = 'player-' + Math.random().toString(36).substr(2, 9);
+    
+    await this.connectToAbly();
+    this.setupControls();
+    
+    console.log('Racing controller ready!');
   }
   
   async connectToAbly() {
