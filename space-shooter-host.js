@@ -934,8 +934,11 @@ function startGame() {
     return;
   }
   
-  document.getElementById('setupScreen').style.display = 'none';
-  document.getElementById('gameScreen').classList.add('active');
+  document.getElementById('setupScreen').classList.add('hidden');
+  setTimeout(() => {
+    document.getElementById('setupScreen').style.display = 'none';
+    document.getElementById('gameScreen').classList.add('active');
+  }, 500);
   
   hostScreen.game = new SpaceShooterGame(hostScreen);
 }
@@ -1016,6 +1019,7 @@ function quitToMenu() {
   document.getElementById('gameOverScreen').classList.remove('active');
   document.getElementById('gameScreen').classList.remove('active');
   document.getElementById('setupScreen').style.display = 'flex';
+  document.getElementById('setupScreen').classList.remove('hidden');
   
   // Reset player list
   if (hostScreen) {
