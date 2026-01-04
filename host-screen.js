@@ -80,11 +80,6 @@ class HostScreen {
         this.handlePlayerJoinRequest(message.data);
       });
       
-      // Listen for swing events
-      this.channel.subscribe('swing', (message) => {
-        this.handleSwing(message.data);
-      });
-      
       // Listen for player disconnect
       this.channel.subscribe('playerLeave', (message) => {
         this.handlePlayerLeave(message.data);
