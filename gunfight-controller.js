@@ -237,7 +237,7 @@ class GunFightController {
     const container = document.getElementById(containerId);
     const stick = document.getElementById(stickId);
     
-    const maxDistance = 55; // Maximum distance from center
+    const maxDistance = 35; // Maximum distance from center (adjusted for smaller joystick)
     let startX, startY, centerX, centerY;
     
     const handleStart = (e) => {

@@ -8,6 +8,7 @@ class GunFightHost {
     
     // Game state
     this.players = new Map();
+    this.bullets = []; // Visual bullet tracers
     this.gameStarted = false;
     this.gameMode = 'ffa'; // ffa, tdm, sniper, gunrace
     this.gameTime = 300; // 5 minutes in seconds
@@ -185,9 +186,21 @@ class GunFightHost {
   }
   
   handleMove(player, data) {
-    const speed = player.isCrouching ? 2 : 4;
-    player.vx = data.x * speed;
-    player.vy = data.y * speed;
+    const speed = player.isCrouching ? 3 : 6;
+    const acceleration = 0.3;
+    
+    // Smooth acceleration instead of instant velocity
+    const targetVx = data.x * speed;
+    const targetVy = data.y * speed;
+    
+    player.vx += (targetVx - player.vx) * acceleration;
+    player.vy += (targetVy - player.vy) * acceleration;
+    
+    // Apply friction when not moving
+    if (Math.abs(data.x) < 0.1 && Math.abs(data.y) < 0.1) {
+      player.vx *= 0.85;
+      player.vy *= 0.85;
+    }
   }
   
   handleLook(player, data) {
@@ -239,6 +252,23 @@ class GunFightHost {
     
     // Raycast to find hit
     const hit = this.raycast(player.x, player.y, player.angle, weapon.range);
+    
+    // Create bullet tracer for visual effect
+    const endX = player.x + Math.cos(player.angle) * weapon.range;
+    const endY = player.y + Math.sin(player.angle) * weapon.range;
+    
+    const bulletEndX = hit && hit.player ? hit.player.x : endX;
+    const bulletEndY = hit && hit.player ? hit.player.y : endY;
+    
+    // Add bullet tracer
+    this.bullets.push({
+      startX: player.x,
+      startY: player.y,
+      endX: bulletEndX,
+      endY: bulletEndY,
+      time: Date.now(),
+      playerId: player.id
+    });
     
     if (hit && hit.player) {
       // Hit another player
@@ -494,6 +524,10 @@ class GunFightHost {
   }
   
   update() {
+    // Remove old bullet tracers (keep for 100ms)
+    const now = Date.now();
+    this.bullets = this.bullets.filter(bullet => now - bullet.time < 100);
+    
     // Update all players
     for (const [id, player] of this.players) {
       // Update position
@@ -573,6 +607,22 @@ class GunFightHost {
       ctx.strokeStyle = '#666';
       ctx.lineWidth = 2;
       ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    }
+    
+    // Draw bullet tracers
+    for (const bullet of this.bullets) {
+      const age = Date.now() - bullet.time;
+      const opacity = 1 - (age / 100); // Fade out over 100ms
+      
+      ctx.strokeStyle = `rgba(255, 255, 0, ${opacity})`;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(255, 255, 0, 0.8)';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(bullet.startX, bullet.startY);
+      ctx.lineTo(bullet.endX, bullet.endY);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
     }
     
     // Draw players
