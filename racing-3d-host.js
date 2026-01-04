@@ -153,15 +153,16 @@ class Racing3DGame {
     
     this.racers = [];
     this.totalLaps = 3;
-    this.trackLength = 300;
-    this.trackWidth = 50;
+    this.trackRadius = 80;
+    this.trackLength = Math.PI * 2 * this.trackRadius; // Circumference
+    this.trackWidth = 60;
     this.raceStartTime = 0;
     this.raceActive = false;
     this.countdown = 3;
     this.winner = null;
     
     this.setupScene();
-    this.createTrack();
+    this.createSimpleTrack();
     this.initRacers();
     this.startCountdown();
     
@@ -206,108 +207,97 @@ class Racing3DGame {
     this.camera.lookAt(0, 0, 0);
   }
   
-  createTrack() {
-    // Create oval track with curves
-    this.trackCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, -100),
-      new THREE.Vector3(80, 0, -80),
-      new THREE.Vector3(100, 0, 0),
-      new THREE.Vector3(80, 0, 80),
-      new THREE.Vector3(0, 0, 100),
-      new THREE.Vector3(-80, 0, 80),
-      new THREE.Vector3(-100, 0, 0),
-      new THREE.Vector3(-80, 0, -80),
-      new THREE.Vector3(0, 0, -100)
-    ], true);
-    
-    this.trackPoints = this.trackCurve.getPoints(200);
-    this.trackLength = 200;
-    
-    // Create track mesh
-    const trackShape = new THREE.Shape();
-    trackShape.moveTo(-this.trackWidth / 2, 0);
-    trackShape.lineTo(this.trackWidth / 2, 0);
-    trackShape.lineTo(this.trackWidth / 2, 1);
-    trackShape.lineTo(-this.trackWidth / 2, 1);
-    
-    const extrudeSettings = {
-      steps: 200,
-      bevelEnabled: false,
-      extrudePath: this.trackCurve
-    };
-    
-    const trackGeometry = new THREE.ExtrudeGeometry(trackShape, extrudeSettings);
+  createSimpleTrack() {
+    // Create circular track
+    const trackGeometry = new THREE.RingGeometry(this.trackRadius - this.trackWidth/2, this.trackRadius + this.trackWidth/2, 64);
     const trackMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x444444,
-      roughness: 0.7,
-      metalness: 0.3
+      color: 0x333333,
+      roughness: 0.8,
+      metalness: 0.2
     });
     const track = new THREE.Mesh(trackGeometry, trackMaterial);
+    track.rotation.x = -Math.PI / 2;
     track.receiveShadow = true;
     this.scene.add(track);
     
-    // Add barriers on both sides
-    this.createBarriers();
+    // Lane markings (4 lanes)
+    for (let i = 1; i < 4; i++) {
+      const laneRadius = this.trackRadius - this.trackWidth/2 + (this.trackWidth / 4) * i;
+      const laneGeometry = new THREE.RingGeometry(laneRadius - 0.3, laneRadius + 0.3, 64);
+      const laneMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const lane = new THREE.Mesh(laneGeometry, laneMaterial);
+      lane.rotation.x = -Math.PI / 2;
+      lane.position.y = 0.1;
+      this.scene.add(lane);
+    }
     
-    // Add start/finish line
-    const finishGeometry = new THREE.BoxGeometry(this.trackWidth, 0.5, 5);
+    // Start/Finish line
+    const finishGeometry = new THREE.BoxGeometry(this.trackWidth, 0.5, 4);
     const finishMaterial = new THREE.MeshStandardMaterial({ 
       color: 0xffffff,
       emissive: 0xffffff,
-      emissiveIntensity: 0.3
+      emissiveIntensity: 0.5
     });
     const finishLine = new THREE.Mesh(finishGeometry, finishMaterial);
-    finishLine.position.copy(this.trackPoints[0]);
-    finishLine.position.y = 0.5;
+    finishLine.position.set(0, 0.3, -this.trackRadius);
     this.scene.add(finishLine);
     
-    // Add checkered pattern
-    for (let i = 0; i < 10; i++) {
+    // Checkered finish line pattern
+    for (let i = 0; i < 12; i++) {
       const checker = new THREE.Mesh(
-        new THREE.BoxGeometry(this.trackWidth / 10, 0.6, 5),
+        new THREE.BoxGeometry(this.trackWidth / 12, 0.6, 4),
         new THREE.MeshStandardMaterial({ 
           color: i % 2 === 0 ? 0x000000 : 0xffffff,
           emissive: i % 2 === 0 ? 0x000000 : 0xffffff,
-          emissiveIntensity: 0.2
+          emissiveIntensity: 0.3
         })
       );
-      checker.position.copy(this.trackPoints[0]);
-      checker.position.x += (-this.trackWidth / 2) + (this.trackWidth / 10) * i + (this.trackWidth / 20);
-      checker.position.y = 0.6;
+      checker.position.set(-this.trackWidth/2 + (this.trackWidth/12) * i + this.trackWidth/24, 0.4, -this.trackRadius);
       this.scene.add(checker);
     }
+    
+    // Add barriers
+    this.createSimpleBarriers();
   }
   
-  createBarriers() {
-    // Create barriers along the track
-    const barrierGeometry = new THREE.BoxGeometry(2, 5, 2);
-    const barrierMaterial = new THREE.MeshStandardMaterial({ 
+  createSimpleBarriers() {
+    const barrierGeometry = new THREE.BoxGeometry(2, 4, 2);
+    const innerMaterial = new THREE.MeshStandardMaterial({ 
       color: 0xff0000,
       emissive: 0xff0000,
-      emissiveIntensity: 0.2
+      emissiveIntensity: 0.3
+    });
+    const outerMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x00ff00,
+      emissive: 0x00ff00,
+      emissiveIntensity: 0.3
     });
     
-    for (let i = 0; i < this.trackPoints.length; i += 5) {
-      const point = this.trackPoints[i];
-      const nextPoint = this.trackPoints[(i + 1) % this.trackPoints.length];
-      const direction = new THREE.Vector3().subVectors(nextPoint, point).normalize();
-      const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
+    const numBarriers = 32;
+    for (let i = 0; i < numBarriers; i++) {
+      const angle = (i / numBarriers) * Math.PI * 2;
       
       // Inner barrier
-      const innerBarrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
-      innerBarrier.position.copy(point);
-      innerBarrier.position.add(perpendicular.clone().multiplyScalar(-this.trackWidth / 2 - 2));
-      innerBarrier.position.y = 2.5;
+      const innerBarrier = new THREE.Mesh(barrierGeometry, innerMaterial);
+      const innerRadius = this.trackRadius - this.trackWidth/2 - 3;
+      innerBarrier.position.set(
+        Math.sin(angle) * innerRadius,
+        2,
+        Math.cos(angle) * innerRadius
+      );
+      innerBarrier.rotation.y = -angle;
       innerBarrier.castShadow = true;
       this.scene.add(innerBarrier);
       
       // Outer barrier
-      const outerBarrier = new THREE.Mesh(barrierGeometry, barrierMaterial.clone());
-      outerBarrier.material.color.set(0xffff00);
-      outerBarrier.material.emissive.set(0xffff00);
-      outerBarrier.position.copy(point);
-      outerBarrier.position.add(perpendicular.clone().multiplyScalar(this.trackWidth / 2 + 2));
-      outerBarrier.position.y = 2.5;
+      const outerBarrier = new THREE.Mesh(barrierGeometry, outerMaterial);
+      const outerRadius = this.trackRadius + this.trackWidth/2 + 3;
+      outerBarrier.position.set(
+        Math.sin(angle) * outerRadius,
+        2,
+        Math.cos(angle) * outerRadius
+      );
+      outerBarrier.rotation.y = -angle;
       outerBarrier.castShadow = true;
       this.scene.add(outerBarrier);
     }
@@ -315,77 +305,66 @@ class Racing3DGame {
   
   initRacers() {
     let laneIndex = 0;
+    const numLanes = 8;
     
     // Add human players
     this.host.players.forEach((player, playerId) => {
-      this.racers.push(this.createCar(playerId, player.name, player.color, laneIndex));
+      this.racers.push(this.createCar(playerId, player.name, player.color, laneIndex, numLanes));
       laneIndex++;
     });
     
     // Add AI racers
     if (this.host.gameMode === 'ai') {
       const carColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xff8800, 0x8800ff];
-      while (laneIndex < 8) {
+      while (laneIndex < numLanes) {
         this.racers.push(this.createCar(
           'ai-' + laneIndex,
           `AI ${laneIndex + 1}`,
           carColors[laneIndex],
           laneIndex,
+          numLanes,
           true,
-          0.8 + Math.random() * 0.6
+          1.2 + Math.random() * 0.8
         ));
         laneIndex++;
       }
     }
   }
   
-  createCar(id, name, color, laneIndex, isAI = false, aiSpeed = 0) {
+  createCar(id, name, color, laneIndex, totalLanes, isAI = false, aiSpeed = 0) {
     const carGroup = new THREE.Group();
     
-    // Car body (more detailed)
-    const bodyGeometry = new THREE.BoxGeometry(4, 2, 7);
+    // Simpler car body
+    const bodyGeometry = new THREE.BoxGeometry(4, 2, 6);
     const bodyMaterial = new THREE.MeshStandardMaterial({ 
       color: color, 
-      metalness: 0.8, 
+      metalness: 0.7, 
       roughness: 0.3
     });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 1.5;
+    body.position.y = 1;
     body.castShadow = true;
     carGroup.add(body);
     
     // Roof
-    const roofGeometry = new THREE.BoxGeometry(3.5, 1.5, 4);
+    const roofGeometry = new THREE.BoxGeometry(3.5, 1.2, 3.5);
     const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
-    roof.position.y = 3;
+    roof.position.y = 2.5;
     roof.castShadow = true;
     carGroup.add(roof);
     
-    // Windows
-    const windowMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x111111,
-      metalness: 0.9,
-      roughness: 0.1,
-      transparent: true,
-      opacity: 0.7
-    });
-    const windowGeometry = new THREE.BoxGeometry(3.4, 1.4, 3.9);
-    const windows = new THREE.Mesh(windowGeometry, windowMaterial);
-    windows.position.y = 3;
-    carGroup.add(windows);
-    
-    // Wheels (bigger and more visible)
-    const wheelGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.8, 16);
+    // Wheels
+    const wheelGeometry = new THREE.CylinderGeometry(0.7, 0.7, 0.8, 12);
     const wheelMaterial = new THREE.MeshStandardMaterial({ 
       color: 0x000000,
-      metalness: 0.5,
-      roughness: 0.7
+      metalness: 0.3,
+      roughness: 0.8
     });
     const wheelPositions = [
-      [-2, 0.8, 2.5],
-      [2, 0.8, 2.5],
-      [-2, 0.8, -2.5],
-      [2, 0.8, -2.5]
+      [-2, 0.7, 2],
+      [2, 0.7, 2],
+      [-2, 0.7, -2],
+      [2, 0.7, -2]
     ];
     
     wheelPositions.forEach(pos => {
@@ -396,23 +375,16 @@ class Racing3DGame {
       carGroup.add(wheel);
     });
     
-    // Headlights
-    const headlightGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-    const headlightMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0xffff00,
-      emissive: 0xffff00,
-      emissiveIntensity: 1
-    });
-    [-1.5, 1.5].forEach(x => {
-      const light = new THREE.Mesh(headlightGeometry, headlightMaterial);
-      light.position.set(x, 1.5, 3.7);
-      carGroup.add(light);
-    });
+    // Calculate starting position on track
+    const laneRadius = this.trackRadius - this.trackWidth/2 + (this.trackWidth / totalLanes) * laneIndex + (this.trackWidth / totalLanes / 2);
+    const startAngle = 0; // Start at finish line
     
-    // Start position on track
-    const startPoint = this.trackPoints[laneIndex * 3];
-    carGroup.position.copy(startPoint);
-    carGroup.position.y = 0;
+    carGroup.position.set(
+      Math.sin(startAngle) * laneRadius,
+      0,
+      Math.cos(startAngle) * laneRadius
+    );
+    carGroup.rotation.y = -startAngle;
     
     this.scene.add(carGroup);
     
@@ -421,12 +393,13 @@ class Racing3DGame {
       name,
       mesh: carGroup,
       lane: laneIndex,
+      laneRadius,
       speed: 0,
-      trackPosition: laneIndex * 3,
+      angle: startAngle,
       lap: 1,
+      lastAngle: startAngle,
       isAI,
       aiSpeed,
-      lastCheckpoint: 0,
       finished: false,
       finishTime: 0
     };
@@ -467,7 +440,8 @@ class Racing3DGame {
   handleRacerControl(data) {
     const racer = this.racers.find(r => r.id === data.playerId);
     if (racer && !racer.finished && this.raceActive) {
-      racer.speed = Math.max(0, Math.min(data.speed * 1.5, 3)); // 0 to 3
+      // Speed from phone tilt (0 to 2)
+      racer.speed = Math.max(0, Math.min(data.speed * 2, 3));
     }
   }
   
@@ -481,57 +455,53 @@ class Racing3DGame {
       allFinished = false;
       
       if (racer.isAI) {
-        // AI control with slight variation
-        racer.speed = racer.aiSpeed + Math.sin(Date.now() / 2000) * 0.1;
+        // AI constant speed with small variation
+        racer.speed = racer.aiSpeed + Math.sin(Date.now() / 3000) * 0.2;
       }
       
-      // Move along track
-      racer.trackPosition += racer.speed;
+      // Calculate angle increment based on speed
+      // Speed 0-3, angle increment should be small
+      const angleIncrement = (racer.speed / racer.laneRadius) * 0.1;
+      const prevAngle = racer.angle;
+      racer.angle += angleIncrement;
       
-      // Wrap around track
-      if (racer.trackPosition >= this.trackLength) {
-        racer.trackPosition -= this.trackLength;
-        racer.lap++;
+      // Wrap angle
+      if (racer.angle >= Math.PI * 2) {
+        racer.angle -= Math.PI * 2;
         
-        if (racer.lap > this.totalLaps) {
-          racer.finished = true;
-          racer.finishTime = Date.now() - this.raceStartTime;
+        // Lap detection: crossed from high angle to low angle
+        if (prevAngle > Math.PI * 1.8) {
+          racer.lap++;
           
-          if (!this.winner) {
-            this.winner = racer;
+          if (racer.lap > this.totalLaps) {
+            racer.finished = true;
+            racer.finishTime = Date.now() - this.raceStartTime;
+            
+            if (!this.winner) {
+              this.winner = racer;
+            }
+            
+            this.host.channel.publish('racerFinished', {
+              racerId: racer.id,
+              name: racer.name,
+              time: racer.finishTime
+            });
           }
-          
-          this.host.channel.publish('racerFinished', {
-            racerId: racer.id,
-            name: racer.name,
-            time: racer.finishTime
-          });
         }
       }
       
-      // Update car position and rotation on track
-      const currentIndex = Math.floor(racer.trackPosition);
-      const nextIndex = (currentIndex + 1) % this.trackLength;
-      const t = racer.trackPosition - currentIndex;
+      // Update car position on circular track
+      racer.mesh.position.set(
+        Math.sin(racer.angle) * racer.laneRadius,
+        0,
+        Math.cos(racer.angle) * racer.laneRadius
+      );
       
-      const currentPoint = this.trackPoints[currentIndex];
-      const nextPoint = this.trackPoints[nextIndex];
+      // Rotate car to face direction of movement
+      racer.mesh.rotation.y = -racer.angle;
       
-      // Interpolate position
-      racer.mesh.position.lerpVectors(currentPoint, nextPoint, t);
-      racer.mesh.position.y = 0;
-      
-      // Calculate rotation to face direction of movement
-      const direction = new THREE.Vector3().subVectors(nextPoint, currentPoint).normalize();
-      const angle = Math.atan2(direction.x, direction.z);
-      racer.mesh.rotation.y = angle;
-      
-      // Tilt car slightly when turning
-      const nextNextIndex = (nextIndex + 1) % this.trackLength;
-      const nextNextPoint = this.trackPoints[nextNextIndex];
-      const nextDirection = new THREE.Vector3().subVectors(nextNextPoint, nextPoint).normalize();
-      const turnAngle = Math.atan2(nextDirection.x, nextDirection.z) - angle;
-      racer.mesh.rotation.z = -turnAngle * 0.3;
+      // Slight tilt when moving fast
+      racer.mesh.rotation.z = -Math.sin(racer.angle) * (racer.speed / 100);
     });
     
     this.updateLeaderboard();
@@ -543,22 +513,35 @@ class Racing3DGame {
   }
   
   updateCamera() {
-    // Dynamic camera following the leader
+    // Follow the leader from above and behind
     if (this.racers.length > 0) {
       const sorted = [...this.racers].sort((a, b) => {
         if (a.lap !== b.lap) return b.lap - a.lap;
-        return b.trackPosition - a.trackPosition;
+        return b.angle - a.angle;
       });
       
       const leader = sorted[0];
       if (leader) {
-        const targetPos = leader.mesh.position.clone();
-        targetPos.y = 100;
-        targetPos.z -= 80;
+        // Calculate camera position behind and above the leader
+        const cameraRadius = leader.laneRadius + 40;
+        const cameraAngle = leader.angle - 0.3; // Slightly behind
+        const targetPos = new THREE.Vector3(
+          Math.sin(cameraAngle) * cameraRadius,
+          60,
+          Math.cos(cameraAngle) * cameraRadius
+        );
         
         // Smooth camera movement
-        this.camera.position.lerp(targetPos, 0.05);
-        this.camera.lookAt(leader.mesh.position.x, 0, leader.mesh.position.z);
+        this.camera.position.lerp(targetPos, 0.03);
+        
+        // Look at point ahead of leader
+        const lookAheadAngle = leader.angle + 0.5;
+        const lookAtPos = new THREE.Vector3(
+          Math.sin(lookAheadAngle) * leader.laneRadius,
+          0,
+          Math.cos(lookAheadAngle) * leader.laneRadius
+        );
+        this.camera.lookAt(lookAtPos);
       }
     }
   }
