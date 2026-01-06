@@ -193,6 +193,36 @@ class SpaceShooterHost {
     status.textContent = message;
     status.style.color = connected ? '#4ade80' : '#f87171';
   }
+
+  showGameEvent(text) {
+    const container = document.getElementById('gameScreen');
+    const event = document.createElement('div');
+    event.className = 'game-event';
+    event.textContent = text;
+    container.appendChild(event);
+    
+    setTimeout(() => event.remove(), 1000);
+  }
+
+  triggerScreenFlash(color) {
+    const flash = document.getElementById('screenFlash');
+    if (flash) {
+      flash.style.backgroundColor = color || 'white';
+      flash.classList.remove('active');
+      void flash.offsetWidth; // trigger reflow
+      flash.classList.add('active');
+    }
+  }
+
+  showKillNotification(killer, victim) {
+    const container = document.getElementById('gameScreen');
+    const notif = document.createElement('div');
+    notif.className = 'kill-notif';
+    notif.innerHTML = `${killer} <span style="color:#fff; font-size:0.6em;">DESTROYED</span> ${victim}`;
+    container.appendChild(notif);
+    
+    setTimeout(() => notif.remove(), 1500);
+  }
 }
 
 // Game Logic
@@ -719,7 +749,7 @@ class SpaceShooterGame {
     
     // Show hit indicator
     if (victimPlayer.health > 0) {
-      this.showGameEvent(`HIT! -10 HP`);
+      this.host.showGameEvent(`HIT! -10 HP`);
     }
     
     // Send haptic feedback and health update to controllers
@@ -863,6 +893,13 @@ class SpaceShooterGame {
     // Clear
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    // Center the view and zoom in
+    // Logic: Move origin to center, scale, then move back
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(1.5, 1.5); 
+    ctx.translate(-canvas.width / 2, -canvas.height / 2);
     
     // Draw stars
     ctx.fillStyle = '#fff';
@@ -972,6 +1009,8 @@ class SpaceShooterGame {
       
       ctx.restore();
     });
+
+    ctx.restore(); // End zoom transform
   }
   
   drawRocket(ctx, player, side) {
