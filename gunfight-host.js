@@ -15,6 +15,10 @@ class GunFightHost {
     this.gameTime = 300; // 5 minutes in seconds
     this.gameTimer = null;
     
+    // Power-ups (Pops)
+    this.pops = [];
+    this.popSpawnTimer = 0;
+    
     // Canvas
     this.canvas = document.getElementById('gameCanvas');
     this.ctx = this.canvas.getContext('2d');
@@ -28,9 +32,9 @@ class GunFightHost {
     
     // Weapons
     this.weapons = {
-      primary: { name: 'Assault Rifle', damage: 25, fireRate: 75, range: 500, ammo: 100, maxAmmo: 500 },
-      secondary: { name: 'Pistol', damage: 35, fireRate: 150, range: 300, ammo: 50, maxAmmo: 250 },
-      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 600, range: 1000, ammo: 20, maxAmmo: 100 }
+      primary: { name: 'Assault Rifle', damage: 25, fireRate: 75, range: 500, ammo: 250, maxAmmo: 1000 },
+      secondary: { name: 'Pistol', damage: 35, fireRate: 150, range: 300, ammo: 100, maxAmmo: 500 },
+      sniper: { name: 'Sniper Rifle', damage: 100, fireRate: 600, range: 1000, ammo: 50, maxAmmo: 200 }
     };
     
     this.init();
@@ -376,6 +380,7 @@ class GunFightHost {
       
       // Add to kill feed
       this.addKillFeed(attacker.name, player.name);
+      this.triggerFlash('rgba(255, 0, 0, 0.4)');
       
       // Respawn player after delay
       setTimeout(() => {
@@ -580,6 +585,15 @@ class GunFightHost {
     const now = Date.now();
     this.bullets = this.bullets.filter(bullet => now - bullet.time < 100);
     this.explosions = this.explosions.filter(exp => now - exp.time < 500);
+
+    const dt = 1/60; // Approximate dt
+
+    // Spawn Power-ups
+    this.popSpawnTimer += dt;
+    if (this.popSpawnTimer > 10) { // Every 10 seconds
+      this.spawnPop();
+      this.popSpawnTimer = 0;
+    }
     
     // Update all players
     for (const [id, player] of this.players) {
@@ -622,7 +636,65 @@ class GunFightHost {
           break;
         }
       }
+      
+      // Check collision with pops
+      this.pops = this.pops.filter(pop => {
+        const dx = player.x - pop.x;
+        const dy = player.y - pop.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 40) { // Pickup radius
+          this.applyPop(player, pop);
+          return false;
+        }
+        return true;
+      });
     }
+  }
+
+  spawnPop() {
+    const types = ['health', 'ammo'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    this.pops.push({
+      x: Math.random() * (this.arena.width - 200) + 100,
+      y: Math.random() * (this.arena.height - 200) + 100,
+      type: type,
+      time: Date.now()
+    });
+  }
+
+  applyPop(player, pop) {
+    if (pop.type === 'health') {
+      player.health = Math.min(100, player.health + 40);
+      this.triggerFlash('rgba(0, 255, 0, 0.2)');
+    } else if (pop.type === 'ammo') {
+      player.maxAmmo += 200;
+      this.triggerFlash('rgba(255, 255, 0, 0.2)');
+    }
+    
+    // Pulse HUD
+    player.isPoweredUp = true;
+    setTimeout(() => {
+      player.isPoweredUp = false;
+      this.updatePlayerStatsHUD();
+    }, 2000);
+
+    this.updatePlayerState(player);
+    this.playShootSound(); // Use some sound
+    this.updatePlayerStatsHUD();
+    
+    this.showGameEvent(`${player.name} PICKED UP ${pop.type.toUpperCase()}!`);
+  }
+
+  showGameEvent(text) {
+    const gameHud = document.getElementById('gameHud');
+    const message = document.createElement('div');
+    message.className = 'game-message';
+    message.style.fontSize = '2em';
+    message.textContent = text;
+    gameHud.appendChild(message);
+    
+    setTimeout(() => message.remove(), 2000);
   }
   
   checkCollision(player, obstacle) {
@@ -731,6 +803,34 @@ class GunFightHost {
       ctx.lineWidth = 2;
       ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
     }
+
+    // Draw Power-ups (Pops)
+    for (const pop of this.pops) {
+      const pulse = Math.sin(Date.now() / 200) * 5;
+      const color = pop.type === 'health' ? '#4ade80' : '#fbbf24';
+      
+      // Glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(pop.x, pop.y, 15 + pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Icon
+      ctx.fillStyle = 'white';
+      if (pop.type === 'health') {
+        const size = 10;
+        ctx.fillRect(pop.x - size, pop.y - 2, size * 2, 4);
+        ctx.fillRect(pop.x - 2, pop.y - size, 4, size * 2);
+      } else {
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('A', pop.x, pop.y);
+      }
+    }
     
     // Draw bullet tracers
     for (const bullet of this.bullets) {
@@ -822,25 +922,71 @@ class GunFightHost {
     });
     
     scoreList.innerHTML = html;
+
+    this.updatePlayerStatsHUD();
+  }
+
+  updatePlayerStatsHUD() {
+    const statsContainer = document.getElementById('playerStats');
+    if (!statsContainer) return;
+
+    let html = '';
+    for (const [id, player] of this.players) {
+      const weapon = this.weapons[player.weapon];
+      const isLowHealth = player.health < 30;
+      
+      html += `
+        <div class="stat-card ${player.isPoweredUp ? 'active-power' : ''}">
+          <div class="player-name" style="color: ${player.color}">${player.name}</div>
+          <div class="health-container">
+            <div class="health-bar">
+              <div class="health-fill ${isLowHealth ? 'low' : ''}" style="width: ${player.health}%"></div>
+            </div>
+            <div class="stat-row">
+              <span>HP</span>
+              <span>${Math.ceil(player.health)}/100</span>
+            </div>
+          </div>
+          <div class="stat-row">
+            <span>Ammo</span>
+            <span>${player.ammo} / ${player.maxAmmo}</span>
+          </div>
+        </div>
+      `;
+    }
+    statsContainer.innerHTML = html;
   }
   
   addKillFeed(killerName, victimName) {
     const killFeed = document.getElementById('killFeed');
     
     const killItem = document.createElement('div');
-    killItem.className = 'kill-item';
-    killItem.innerHTML = `${killerName} <span style="color: #ff4444">💀</span> ${victimName}`;
+    killItem.className = 'kill-item kill-feed-anim';
+    killItem.innerHTML = `<span style="color:#ffaa00">${killerName}</span> <span style="color: #ff4444; margin: 0 5px;">[💀]</span> ${victimName}`;
     
     killFeed.insertBefore(killItem, killFeed.firstChild);
     
     // Remove after 5 seconds
     setTimeout(() => {
-      killItem.remove();
+      killItem.style.opacity = '0';
+      killItem.style.transform = 'translateX(20px)';
+      killItem.style.transition = 'all 0.5s';
+      setTimeout(() => killItem.remove(), 500);
     }, 5000);
     
     // Keep only last 5 kills
     while (killFeed.children.length > 5) {
       killFeed.lastChild.remove();
+    }
+  }
+
+  triggerFlash(color) {
+    const flash = document.getElementById('screenFlash');
+    if (flash) {
+      flash.style.background = color || 'white';
+      flash.classList.remove('active');
+      void flash.offsetWidth; // trigger reflow
+      flash.classList.add('active');
     }
   }
   

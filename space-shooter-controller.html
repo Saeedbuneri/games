@@ -133,55 +133,58 @@
       align-items: center;
       justify-content: space-around;
       gap: 20px;
+      width: 100%;
+      padding: 0 40px;
     }
 
-    .joystick-container {
-      position: relative;
-      width: 150px;
-      height: 150px;
-      background: rgba(102, 126, 234, 0.15);
-      border: 2px solid rgba(102, 126, 234, 0.4);
-      border-radius: 50%;
+    .move-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .control-btn {
+      width: 140px;
+      height: 140px;
+      border-radius: 25px;
+      border: 4px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 3.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       touch-action: none;
-    }
-
-    .joystick-container.firing {
-      background: rgba(255, 0, 0, 0.2);
-      border-color: rgba(255, 0, 0, 0.6);
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
-    }
-
-    .joystick-stick {
-      position: absolute;
-      width: 60px;
-      height: 60px;
-      background: radial-gradient(circle, rgba(102, 126, 234, 0.6), rgba(102, 126, 234, 0.3));
-      border: 3px solid rgba(102, 126, 234, 0.6);
-      border-radius: 50%;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
       transition: all 0.1s;
-      pointer-events: none;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.3);
     }
+
+    .control-btn:active {
+      transform: scale(0.9);
+      background: rgba(255,255,255,0.3);
+      box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+    }
+
+    .up-btn { background: linear-gradient(135deg, #10b981, #059669); }
+    .down-btn { background: linear-gradient(135deg, #3b82f6, #2563eb); }
 
     .fire-btn {
-      padding: 40px;
+      padding: 0;
       border: none;
       border-radius: 50%;
-      font-size: 2em;
+      font-size: 2.5em;
       font-weight: 900;
       color: white;
       background: linear-gradient(135deg, #ef4444, #dc2626);
-      border: 5px solid rgba(239, 68, 68, 0.5);
+      border: 8px solid rgba(239, 68, 68, 0.5);
       cursor: pointer;
       transition: all 0.1s;
       touch-action: none;
-      box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
-      width: 150px;
-      height: 150px;
-      margin: 20px auto;
+      box-shadow: 0 15px 45px rgba(239, 68, 68, 0.5);
+      width: 180px;
+      height: 180px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
     }
@@ -189,7 +192,7 @@
     .fire-btn:active {
       background: linear-gradient(135deg, #dc2626, #b91c1c);
       transform: scale(0.9);
-      box-shadow: 0 5px 20px rgba(239, 68, 68, 0.6);
+      box-shadow: 0 5px 20px rgba(239, 68, 68, 0.7);
     }
 
     .health-display {
@@ -197,6 +200,29 @@
       background: rgba(0,0,0,0.5);
       border-radius: 10px;
       text-align: center;
+    }
+
+    /* Power Mode FX */
+    #controllerScreen.power-mode {
+      box-shadow: inset 0 0 50px rgba(255, 170, 0, 0.4);
+    }
+    
+    #controllerScreen.power-mode::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: 6px solid #ffaa00;
+      pointer-events: none;
+      animation: borderPulse 1s infinite alternate;
+      z-index: 1000;
+    }
+
+    @keyframes borderPulse {
+      from { opacity: 0.2; }
+      to { opacity: 0.6; }
     }
 
     .health-bar {
@@ -217,6 +243,90 @@
       background: rgba(239, 68, 68, 0.3);
       border: 2px solid rgba(239, 68, 68, 0.5);
       color: white;
+    }
+
+    /* Landscape Optimizations */
+    @media (orientation: landscape) {
+      .controller {
+        flex-direction: column;
+        padding: 5px 20px;
+        gap: 5px;
+      }
+
+      .status-header {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 5px 15px;
+        margin-bottom: 0;
+        gap: 20px;
+        padding-right: 120px; /* Space for leave button */
+      }
+
+      .status-header h1, 
+      .status-header > div:first-child { 
+        font-size: 1.1em !important; 
+        margin: 0;
+      }
+
+      .side-badge {
+        font-size: 0.8em;
+        padding: 4px 12px;
+        margin: 0;
+      }
+
+      .health-display {
+        flex: 1;
+        max-width: 200px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 10px;
+      }
+
+      .health-display > div:first-child { display: none; } /* Hide "Your Health" text */
+      .health-bar { flex: 1; margin: 0; height: 12px; }
+      #healthText { font-size: 0.9em !important; min-width: 40px; }
+
+      .controls {
+        flex: 1;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding: 0 10px 10px 10px;
+      }
+
+      .move-btns {
+        flex-direction: row;
+        gap: 20px;
+      }
+
+      .control-btn {
+        width: 110px;
+        height: 110px;
+        font-size: 2.5em;
+        border-radius: 20px;
+      }
+
+      .fire-btn {
+        width: 150px;
+        height: 150px;
+        font-size: 2em;
+      }
+
+      .btn-leave {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: auto;
+        padding: 8px 15px;
+        font-size: 0.8em;
+        margin: 0;
+        background: rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.2);
+        z-index: 10;
+      }
     }
 
     .game-over-overlay {
@@ -302,13 +412,14 @@
       </div>
 
       <div class="controls">
-        <div class="joystick-container" id="moveJoystick">
-          <div class="joystick-stick" id="moveStick"></div>
+        <div class="move-btns">
+          <button id="btnUp" class="control-btn up-btn">▲</button>
+          <button id="btnDown" class="control-btn down-btn">▼</button>
         </div>
 
-        <button class="fire-btn" id="btnFire" style="display: none;">
-          🔥<br>
-          <span style="font-size: 0.4em;">FIRE</span>
+        <button class="fire-btn" id="btnFire">
+          🚀<br>
+          <span style="font-size: 0.5em;">FIRE</span>
         </button>
       </div>
 

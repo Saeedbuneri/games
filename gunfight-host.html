@@ -391,6 +391,50 @@
       50% { transform: translate(-50%, -50%) scale(1.1); }
     }
 
+    /* Screen Flash */
+    .screen-flash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2000;
+      opacity: 0;
+      background: white;
+    }
+
+    .screen-flash.active {
+      animation: flashAnim 0.3s ease-out;
+    }
+
+    @keyframes flashAnim {
+      0% { opacity: 0.6; }
+      100% { opacity: 0; }
+    }
+
+    /* Kill Animation */
+    .kill-feed-anim {
+      animation: killItemPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes killItemPop {
+      0% { transform: translateX(100%) scale(0.5); opacity: 0; }
+      100% { transform: translateX(0) scale(1); opacity: 1; }
+    }
+
+    /* Power Pulse */
+    .stat-card.active-power {
+      border-color: #ffaa00;
+      box-shadow: 0 0 20px rgba(255, 170, 0, 0.4);
+      animation: statPulse 1s infinite alternate;
+    }
+
+    @keyframes statPulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.02); }
+    }
+
     /* Mini Map */
     .minimap {
       position: absolute;
@@ -485,6 +529,7 @@
   </style>
 </head>
 <body>
+  <div id="screenFlash" class="screen-flash"></div>
   <!-- Setup Screen -->
   <div id="setupScreen" class="setup-screen">
     <div class="setup-card">

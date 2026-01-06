@@ -222,8 +222,10 @@ class SpaceShooterGame {
         playerId: null,
         isBot: false,
         rotation: 0,
-        powerUpTimer: 0,
-        hasPowerUp: false
+        powerFireTimer: 0,
+        multiShotTimer: 0,
+        hasPowerFire: false,
+        hasMultiShot: false
       },
       right: {
         x: this.canvas.width - 80,
@@ -242,8 +244,10 @@ class SpaceShooterGame {
         playerId: null,
         isBot: false,
         rotation: 0,
-        powerUpTimer: 0,
-        hasPowerUp: false
+        powerFireTimer: 0,
+        multiShotTimer: 0,
+        hasPowerFire: false,
+        hasMultiShot: false
       }
     };
     
@@ -293,6 +297,10 @@ class SpaceShooterGame {
         speed: Math.random() * 0.5 + 0.1
       });
     }
+    
+    // Healing pops
+    this.healingPops = [];
+    this.healSpawnTimer = 0;
     
     // Notify players
     host.channel.publish('gameStarted', {
@@ -353,18 +361,57 @@ class SpaceShooterGame {
       // Keep in bounds
       player.y = Math.max(player.height / 2, Math.min(this.canvas.height - player.height / 2, player.y));
       
-      // Update power-up timer (boost every 15 seconds for 5 seconds)
-      player.powerUpTimer += dt;
-      if (player.powerUpTimer >= 15 && player.powerUpTimer < 20) {
-        if (!player.hasPowerUp) {
-          player.hasPowerUp = true;
-          player.fireRate = 100; // Faster shooting
-          this.showGameEvent(`${side.toUpperCase()} BOOST ACTIVATED! 🚀`);
+      // Update Power Fire (every 10s for 2s)
+      player.powerFireTimer += dt;
+      if (player.powerFireTimer >= 10) {
+        if (!player.hasPowerFire) {
+          player.hasPowerFire = true;
+          this.host.showGameEvent(`${side.toUpperCase()} POWER FIRE! 🔥`);
+          this.host.triggerScreenFlash('rgba(255, 100, 0, 0.3)');
         }
-      } else if (player.powerUpTimer >= 20) {
-        player.hasPowerUp = false;
-        player.fireRate = 200; // Normal shooting
-        player.powerUpTimer = 0;
+        if (player.powerFireTimer >= 12) {
+          player.hasPowerFire = false;
+          player.powerFireTimer = 0;
+        }
+      }
+
+      // Update Triple Bullets (every 15s for 4s)
+      player.multiShotTimer += dt;
+      if (player.multiShotTimer >= 15) {
+        if (!player.hasMultiShot) {
+          player.hasMultiShot = true;
+          this.host.showGameEvent(`${side.toUpperCase()} TRIPLE BULLETS! 🚀`);
+          this.host.triggerScreenFlash('rgba(0, 150, 255, 0.3)');
+        }
+        if (player.multiShotTimer >= 19) {
+          player.hasMultiShot = false;
+          player.multiShotTimer = 0;
+        }
+      }
+      
+      // Adjust fire rate if powered up
+      player.fireRate = player.hasPowerFire ? 100 : 200;
+      
+      // Update HUD animation for power
+      const hud = document.querySelector(`.player-hud.${side}`);
+      if (hud) {
+        if (player.hasPowerFire || player.hasMultiShot) {
+          hud.classList.add('power-active');
+        } else {
+          hud.classList.remove('power-active');
+        }
+      }
+
+      // Sync power state to controller
+      if (player.lastPowerFire !== player.hasPowerFire || player.lastMultiShot !== player.hasMultiShot) {
+        this.host.channel.publish('gameEvent', {
+          type: 'powerUp',
+          side: side,
+          hasPowerFire: player.hasPowerFire,
+          hasMultiShot: player.hasMultiShot
+        });
+        player.lastPowerFire = player.hasPowerFire;
+        player.lastMultiShot = player.hasMultiShot;
       }
       
       // Auto-shoot
@@ -383,17 +430,66 @@ class SpaceShooterGame {
         
         // Check collision with opponent
         const opponent = side === 'left' ? this.players.right : this.players.left;
-        const hit = this.checkBulletCollision(bullet, opponent);
+        const hitOpponent = this.checkBulletCollision(bullet, opponent);
         
-        if (hit) {
-          this.onHit(side, side === 'left' ? 'right' : 'left');
+        if (hitOpponent) {
+          this.onHit(side, side === 'left' ? 'right' : 'left', bullet);
           this.createExplosion(bullet.x, bullet.y);
           return false;
+        }
+
+        // Check collision with healing pops
+        for (let i = 0; i < this.healingPops.length; i++) {
+          const pop = this.healingPops[i];
+          const dist = Math.sqrt((bullet.x - pop.x) ** 2 + (bullet.y - pop.y) ** 2);
+          if (dist < bullet.radius + pop.radius) {
+            // Heal player who shot it
+            player.health = Math.min(100, player.health + 25);
+            this.host.showGameEvent(`${side.toUpperCase()} HEALED +25 HP! 💚`);
+            this.createHealParticles(pop.x, pop.y);
+            
+            // Update UI
+            const playerNum = side === 'left' ? '1' : '2';
+            const healthBar = document.getElementById('health' + playerNum);
+            healthBar.style.width = player.health + '%';
+            if (player.health >= 30) healthBar.classList.remove('low');
+            
+            this.host.channel.publish('gameEvent', {
+              type: 'hit',
+              side: side,
+              health: player.health,
+              isHeal: true
+            });
+
+            this.healingPops.splice(i, 1);
+            return false;
+          }
         }
         
         // Remove if off screen
         return bullet.x > 0 && bullet.x < this.canvas.width;
       });
+    });
+
+    // Handle Healing Pops Spawning
+    this.healSpawnTimer += dt;
+    if (this.healSpawnTimer > 8) { // Spawn every 8 seconds
+      this.healingPops.push({
+        x: this.canvas.width / 2 + (Math.random() - 0.5) * 200, // Near middle
+        y: -50,
+        radius: 25,
+        targetY: this.canvas.height + 50,
+        speed: 100 + Math.random() * 50,
+        pulse: 0
+      });
+      this.healSpawnTimer = 0;
+    }
+
+    // Update Healing Pops Position
+    this.healingPops = this.healingPops.filter(pop => {
+      pop.y += pop.speed * dt;
+      pop.pulse += dt * 5;
+      return pop.y < this.canvas.height + 50;
     });
     
     // Update particles
@@ -531,33 +627,40 @@ class SpaceShooterGame {
     const direction = side === 'left' ? 1 : -1;
     const baseX = player.x + (direction > 0 ? player.width / 2 : -player.width / 2);
     
-    // Normal shot
+    // Determine bullet properties
+    const speed = direction * (player.hasPowerFire ? 1500 : 800);
+    const radius = player.hasPowerFire ? 20 : 9;
+    
+    // Main shot (Center)
     player.bullets.push({
       x: baseX,
       y: player.y,
-      vx: direction * 800,
+      vx: speed,
       vy: 0,
-      radius: 9,
-      powerUp: player.hasPowerUp
+      radius: radius,
+      powerUp: player.hasPowerFire
     });
     
-    // Power-up: triple shot
-    if (player.hasPowerUp) {
+    // Triple Bullet power-up (if active, fire 2 extra bullets)
+    if (player.hasMultiShot) {
+      const offset = player.hasPowerFire ? 35 : 25;
+      // Top Bullet
       player.bullets.push({
         x: baseX,
-        y: player.y - 22,
-        vx: direction * 800,
+        y: player.y - offset,
+        vx: speed,
         vy: 0,
-        radius: 9,
-        powerUp: true
+        radius: radius,
+        powerUp: player.hasPowerFire
       });
+      // Bottom Bullet
       player.bullets.push({
         x: baseX,
-        y: player.y + 22,
-        vx: direction * 800,
+        y: player.y + offset,
+        vx: speed,
         vy: 0,
-        radius: 9,
-        powerUp: true
+        radius: radius,
+        powerUp: player.hasPowerFire
       });
     }
     
@@ -588,13 +691,19 @@ class SpaceShooterGame {
     return distance < (bullet.radius + Math.max(player.width, player.height) / 2);
   }
   
-  onHit(shooter, victim) {
+  onHit(shooter, victim, bullet) {
     const shooterPlayer = this.players[shooter];
     const victimPlayer = this.players[victim];
     
-    // Decrease health by 10
-    victimPlayer.health = Math.max(0, victimPlayer.health - 10);
-    shooterPlayer.score += 10;
+    // Decrease health (10 normal, 15 for power-up bullets)
+    const damage = bullet && bullet.powerUp ? 15 : 10;
+    victimPlayer.health = Math.max(0, victimPlayer.health - damage);
+    shooterPlayer.score += damage;
+
+    if (victimPlayer.health === 0 && !victimPlayer.dead) {
+      victimPlayer.dead = true;
+      this.host.showKillNotification(shooterPlayer.name, victimPlayer.name);
+    }
     
     // Update UI
     const victimNum = victim === 'left' ? '1' : '2';
@@ -646,6 +755,20 @@ class SpaceShooterGame {
         life: 0.8,
         color: '#fbbf24',
         size: Math.random() * 4 + 2
+      });
+    }
+  }
+
+  createHealParticles(x, y) {
+    for (let i = 0; i < 15; i++) {
+      this.particles.push({
+        x: x,
+        y: y,
+        vx: (Math.random() - 0.5) * 150,
+        vy: (Math.random() - 0.5) * 150,
+        life: 1.0,
+        color: '#4ade80',
+        size: Math.random() * 5 + 3
       });
     }
   }
@@ -817,6 +940,38 @@ class SpaceShooterGame {
       ctx.stroke();
       ctx.globalAlpha = 1;
     });
+
+    // Draw healing pops
+    this.healingPops.forEach(pop => {
+      const pulseScale = 1 + Math.sin(pop.pulse) * 0.1;
+      
+      ctx.save();
+      ctx.translate(pop.x, pop.y);
+      ctx.scale(pulseScale, pulseScale);
+      
+      // Outer glow
+      ctx.shadowColor = '#4ade80';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = 'rgba(74, 222, 128, 0.3)';
+      ctx.beginPath();
+      ctx.arc(0, 0, pop.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Core
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.arc(0, 0, pop.radius * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Cross
+      ctx.fillStyle = 'white';
+      const w = pop.radius * 0.4;
+      const h = pop.radius * 0.12;
+      ctx.fillRect(-w/2, -h/2, w, h);
+      ctx.fillRect(-h/2, -w/2, h, w);
+      
+      ctx.restore();
+    });
   }
   
   drawRocket(ctx, player, side) {
@@ -921,6 +1076,25 @@ class SpaceShooterGame {
     eventDiv.textContent = text;
     document.body.appendChild(eventDiv);
     setTimeout(() => eventDiv.remove(), 2000);
+  }
+
+  triggerScreenFlash(color) {
+    const flash = document.getElementById('flashOverlay');
+    if (flash) {
+      flash.style.background = color || 'white';
+      flash.classList.remove('active');
+      void flash.offsetWidth; // trigger reflow
+      flash.classList.add('active');
+    }
+  }
+
+  showKillNotification(killerName, victimName) {
+    const notif = document.createElement('div');
+    notif.className = 'kill-notif';
+    notif.innerHTML = `<span style="color:#ef4444">${killerName}</span> <span style="font-size:0.5em; opacity:0.8; vertical-align:middle; margin:0 10px;">DESTROYED</span> <span style="color:#3b82f6">${victimName}</span>`;
+    document.body.appendChild(notif);
+    setTimeout(() => notif.remove(), 1500);
+    this.triggerScreenFlash('rgba(255, 255, 255, 0.4)');
   }
 }
 

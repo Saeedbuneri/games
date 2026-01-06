@@ -10,10 +10,12 @@ class SpaceShooterController {
     this.gameStarted = false;
     this.health = 100;
     
-    // Joystick state
-    this.moveJoystick = { x: 0, y: 0, active: false };
-    this.lastMoveTime = 0;
-    this.inputThrottle = 50;
+    // Control state
+    this.controls = {
+      moveUp: false,
+      moveDown: false,
+      shoot: false
+    };
     
     this.init();
   }
@@ -59,125 +61,52 @@ class SpaceShooterController {
   }
   
   setupControls() {
-    this.setupJoystick('moveJoystick', 'moveStick', (data) => {
-      this.moveJoystick = data;
-      this.sendMovement();
-      
-      // Fire when joystick is pushed towards boundary
-      const magnitude = Math.sqrt(data.x * data.x + data.y * data.y);
-      const container = document.getElementById('moveJoystick');
-      
-      if (magnitude > 0.8 && this.gameStarted) {
-        this.sendAction('shoot', true);
-        container.classList.add('firing');
-      } else {
-        this.sendAction('shoot', false);
-        container.classList.remove('firing');
+    const btnUp = document.getElementById('btnUp');
+    const btnDown = document.getElementById('btnDown');
+    const btnFire = document.getElementById('btnFire');
+
+    const handleAction = (action, value) => {
+      if (!this.isConnected || !this.gameStarted) return;
+      if (this.controls[action] !== value) {
+        this.controls[action] = value;
+        this.sendAction(action, value);
+        // Subtle haptic on press only
+        if (value) this.triggerHaptic([10]);
       }
+    };
+
+    // Helper to add multi-touch compatible listeners
+    const addControlListeners = (el, action) => {
+      el.addEventListener('touchstart', (e) => { 
+        e.preventDefault(); 
+        handleAction(action, true); 
+      }, { passive: false });
+      
+      el.addEventListener('touchend', (e) => { 
+        e.preventDefault(); 
+        handleAction(action, false); 
+      }, { passive: false });
+      
+      el.addEventListener('touchcancel', (e) => { 
+        e.preventDefault(); 
+        handleAction(action, false); 
+      }, { passive: false });
+      
+      el.addEventListener('mousedown', (e) => {
+        handleAction(action, true);
+      });
+    };
+
+    addControlListeners(btnUp, 'moveUp');
+    addControlListeners(btnDown, 'moveDown');
+    addControlListeners(btnFire, 'shoot');
+
+    // Global mouse up to ensure actions stop even if mouse leaves button
+    window.addEventListener('mouseup', () => {
+      handleAction('moveUp', false);
+      handleAction('moveDown', false);
+      handleAction('shoot', false);
     });
-  }
-
-  setupJoystick(containerId, stickId, callback) {
-    const container = document.getElementById(containerId);
-    const stick = document.getElementById(stickId);
-    const maxDistance = 40;
-    let activeTouchId = null;
-    let centerX, centerY;
-
-    const handleStart = (e) => {
-      e.preventDefault();
-      if (activeTouchId !== null) return;
-      const rect = container.getBoundingClientRect();
-      centerX = rect.left + rect.width / 2;
-      centerY = rect.top + rect.height / 2;
-      const touches = e.changedTouches || [e];
-      for (let i = 0; i < touches.length; i++) {
-        const touch = touches[i];
-        activeTouchId = touch.identifier !== undefined ? touch.identifier : 'mouse';
-        updateJoystick(touch);
-        break;
-      }
-    };
-
-    const handleMove = (e) => {
-      if (activeTouchId === null) return;
-      e.preventDefault();
-      const touches = e.changedTouches || [e];
-      for (let i = 0; i < touches.length; i++) {
-        const touch = touches[i];
-        const id = touch.identifier !== undefined ? touch.identifier : 'mouse';
-        if (id === activeTouchId) {
-          updateJoystick(touch);
-          break;
-        }
-      }
-    };
-
-    const updateJoystick = (touch) => {
-      const deltaX = touch.clientX - centerX;
-      const deltaY = touch.clientY - centerY;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      const angle = Math.atan2(deltaY, deltaX);
-      const limitedDistance = Math.min(distance, maxDistance);
-      const x = Math.cos(angle) * limitedDistance;
-      const y = Math.sin(angle) * limitedDistance;
-      stick.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-      let normalizedX = x / maxDistance;
-      let normalizedY = y / maxDistance;
-      const deadzone = 0.15;
-      const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-      if (magnitude < deadzone) {
-        normalizedX = 0;
-        normalizedY = 0;
-      } else {
-        const scaledMag = (magnitude - deadzone) / (1 - deadzone);
-        normalizedX = (normalizedX / magnitude) * scaledMag;
-        normalizedY = (normalizedY / magnitude) * scaledMag;
-      }
-      callback({ x: normalizedX, y: normalizedY, active: magnitude >= deadzone });
-    };
-
-    const handleEnd = (e) => {
-      if (activeTouchId === null) return;
-      const touches = e.changedTouches || [e];
-      for (let i = 0; i < touches.length; i++) {
-        const touch = touches[i];
-        const id = touch.identifier !== undefined ? touch.identifier : 'mouse';
-        if (id === activeTouchId) {
-          activeTouchId = null;
-          stick.style.transform = 'translate(-50%, -50%)';
-          callback({ x: 0, y: 0, active: false });
-          break;
-        }
-      }
-    };
-
-    container.addEventListener('touchstart', handleStart, { passive: false });
-    container.addEventListener('touchmove', handleMove, { passive: false });
-    container.addEventListener('touchend', handleEnd, { passive: false });
-    container.addEventListener('touchcancel', handleEnd, { passive: false });
-    container.addEventListener('mousedown', handleStart);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleEnd);
-  }
-
-  sendMovement() {
-    if (!this.isConnected || !this.gameStarted) return;
-    const now = Date.now();
-    if (this.moveJoystick.active && now - this.lastMoveTime < this.inputThrottle) return;
-    this.lastMoveTime = now;
-    
-    // Space shooter uses moveUp/moveDown actions
-    if (this.moveJoystick.y < -0.3) {
-      this.sendAction('moveUp', true);
-      this.sendAction('moveDown', false);
-    } else if (this.moveJoystick.y > 0.3) {
-      this.sendAction('moveUp', false);
-      this.sendAction('moveDown', true);
-    } else {
-      this.sendAction('moveUp', false);
-      this.sendAction('moveDown', false);
-    }
   }
 
   showScreen(screenId) {
@@ -274,15 +203,27 @@ class SpaceShooterController {
         
       case 'hit':
         if (event.side === this.playerSide) {
-          // You got hit
+          // You got hit or healed
           this.health = event.health;
           this.updateHealth();
-          this.triggerHaptic([50, 20, 50, 20, 50]);
-          this.showHitFeedback();
+          
+          if (event.isHeal) {
+            this.showHealFeedback();
+            this.triggerHaptic([10, 50, 10]);
+          } else {
+            this.showHitFeedback();
+            this.triggerHaptic([50, 20, 50, 20, 50]);
+          }
         } else if (event.shooterSide === this.playerSide) {
           // You hit opponent
           this.showSuccessHit();
           this.triggerHaptic([20, 10, 20]);
+        }
+        break;
+
+      case 'powerUp':
+        if (event.side === this.playerSide) {
+          this.updatePowerHUD(event.hasPowerFire, event.hasMultiShot);
         }
         break;
         
@@ -331,6 +272,47 @@ class SpaceShooterController {
     document.body.appendChild(feedback);
     
     setTimeout(() => feedback.remove(), 500);
+  }
+
+  showHealFeedback() {
+    const feedback = document.createElement('div');
+    feedback.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(74, 222, 128, 0.95);
+      color: white;
+      padding: 30px 50px;
+      border-radius: 20px;
+      font-size: 2.2em;
+      font-weight: 900;
+      z-index: 2000;
+      animation: hitPulse 0.6s ease-out;
+      pointer-events: none;
+      box-shadow: 0 0 30px rgba(74, 222, 128, 0.5);
+    `;
+    feedback.textContent = '💚 HEALED +25%';
+    document.body.appendChild(feedback);
+    
+    setTimeout(() => feedback.remove(), 600);
+  }
+
+  updatePowerHUD(hasPowerFire, hasMultiShot) {
+    const controller = document.getElementById('controllerScreen');
+    if (hasPowerFire || hasMultiShot) {
+      controller.classList.add('power-mode');
+      if (hasPowerFire && !this.wasPowerFire) {
+        this.showNotification('🔥 POWER FIRE ACTIVE!');
+      }
+      if (hasMultiShot && !this.wasMultiShot) {
+        this.showNotification('🚀 TRIPLE BULLETS ACTIVE!');
+      }
+    } else {
+      controller.classList.remove('power-mode');
+    }
+    this.wasPowerFire = hasPowerFire;
+    this.wasMultiShot = hasMultiShot;
   }
   
   showSuccessHit() {
