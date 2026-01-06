@@ -387,10 +387,10 @@ class SpaceShooterGame {
       const player = this.players[side];
       
       if (player.moveUp) {
-        player.y -= 400 * dt;
+        player.y -= 800 * dt;
         player.rotation = -0.15; // Tilt up
       } else if (player.moveDown) {
-        player.y += 400 * dt;
+        player.y += 800 * dt;
         player.rotation = 0.15; // Tilt down
       } else {
         player.rotation = 0; // Level
@@ -683,7 +683,7 @@ class SpaceShooterGame {
     const baseX = player.x + (direction > 0 ? player.width / 2 : -player.width / 2);
     
     // Determine bullet properties
-    const speed = direction * (player.hasPowerFire ? 1500 : 800);
+    const speed = direction * (player.hasPowerFire ? 3000 : 1600);
     const radius = player.hasPowerFire ? 50 : 22;
     
     // Main shot (Center)
