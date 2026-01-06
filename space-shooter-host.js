@@ -240,10 +240,10 @@ class SpaceShooterGame {
 
     this.players = {
       left: {
-        x: 250,
+        x: 450,
         y: centerY,
-        width: 80,
-        height: 120,
+        width: 100,
+        height: 150,
         health: 100,
         score: 0,
         bullets: [],
@@ -262,10 +262,10 @@ class SpaceShooterGame {
         hasMultiShot: false
       },
       right: {
-        x: this.canvas.width - 250,
+        x: this.canvas.width - 450,
         y: centerY,
-        width: 80,
-        height: 120,
+        width: 100,
+        height: 150,
         health: 100,
         score: 0,
         bullets: [],
@@ -530,9 +530,9 @@ class SpaceShooterGame {
     this.healSpawnTimer += dt;
     if (this.healSpawnTimer > 8) { // Spawn every 8 seconds
       this.healingPops.push({
-        x: this.canvas.width / 2 + (Math.random() - 0.5) * 400, // Slightly wider range
+        x: this.canvas.width / 2 + (Math.random() - 0.5) * 600, // Even wider range
         y: -50,
-        radius: 40,
+        radius: 60,
         targetY: this.canvas.height + 50,
         speed: 100 + Math.random() * 50,
         pulse: 0
@@ -684,7 +684,7 @@ class SpaceShooterGame {
     
     // Determine bullet properties
     const speed = direction * (player.hasPowerFire ? 1500 : 800);
-    const radius = player.hasPowerFire ? 35 : 15;
+    const radius = player.hasPowerFire ? 50 : 22;
     
     // Main shot (Center)
     player.bullets.push({
@@ -698,7 +698,7 @@ class SpaceShooterGame {
     
     // Triple Bullet power-up (if active, fire 2 extra bullets)
     if (player.hasMultiShot) {
-      const offset = player.hasPowerFire ? 60 : 40;
+      const offset = player.hasPowerFire ? 80 : 60;
       // Top Bullet
       player.bullets.push({
         x: baseX,
@@ -1039,7 +1039,7 @@ class SpaceShooterGame {
     }
     
     // Scale for better visibility at 100% zoom
-    ctx.scale(2.5, 2.5);
+    ctx.scale(3.8, 3.8);
     
     // Rocket body
     ctx.shadowColor = player.color;
