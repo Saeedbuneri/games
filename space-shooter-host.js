@@ -234,10 +234,14 @@ class SpaceShooterGame {
     this.active = true;
     this.lastFrameTime = Date.now();
     
+    const hudHeight = 150;
+    const playAreaHeight = this.canvas.height - hudHeight;
+    const centerY = hudHeight + (playAreaHeight / 2);
+
     this.players = {
       left: {
         x: 250,
-        y: this.canvas.height / 2,
+        y: centerY,
         width: 80,
         height: 120,
         health: 100,
@@ -259,7 +263,7 @@ class SpaceShooterGame {
       },
       right: {
         x: this.canvas.width - 250,
-        y: this.canvas.height / 2,
+        y: centerY,
         width: 80,
         height: 120,
         health: 100,
@@ -319,12 +323,13 @@ class SpaceShooterGame {
     
     // Stars background
     this.stars = [];
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 200; i++) {
       this.stars.push({
         x: Math.random() * this.canvas.width,
         y: Math.random() * this.canvas.height,
-        size: Math.random() * 4,
-        speed: Math.random() * 0.5 + 0.1
+        size: Math.random() * 3 + 1,
+        speed: Math.random() * 0.5 + 0.1,
+        parallax: Math.random() * 0.5 + 0.5
       });
     }
     
@@ -362,8 +367,11 @@ class SpaceShooterGame {
     
     // Update stars
     this.stars.forEach(star => {
-      star.x -= star.speed * deltaTime;
-      if (star.x < 0) star.x = this.canvas.width;
+      star.x -= star.speed * deltaTime * star.parallax;
+      if (star.x < 0) {
+        star.x = this.canvas.width;
+        star.y = Math.random() * this.canvas.height;
+      }
     });
     
     // Update bot AI
@@ -388,8 +396,9 @@ class SpaceShooterGame {
         player.rotation = 0; // Level
       }
       
-      // Keep in bounds
-      player.y = Math.max(player.height / 2, Math.min(this.canvas.height - player.height / 2, player.y));
+      // Keep in bounds (Avoid going under HUD)
+      const hudHeight = 150;
+      player.y = Math.max(hudHeight + player.height / 2, Math.min(this.canvas.height - player.height / 2, player.y));
       
       // Update Power Fire (every 10s for 2s)
       player.powerFireTimer += dt;
@@ -398,10 +407,18 @@ class SpaceShooterGame {
           player.hasPowerFire = true;
           this.host.showGameEvent(`${side.toUpperCase()} POWER FIRE! 🔥`);
           this.host.triggerScreenFlash('rgba(255, 100, 0, 0.3)');
+          
+          // Update HUD Icon
+          const icon = document.getElementById(`p${side === 'left' ? '1' : '2'}PowerFire`);
+          if (icon) icon.classList.add('active');
         }
         if (player.powerFireTimer >= 12) {
           player.hasPowerFire = false;
           player.powerFireTimer = 0;
+          
+          // Update HUD Icon
+          const icon = document.getElementById(`p${side === 'left' ? '1' : '2'}PowerFire`);
+          if (icon) icon.classList.remove('active');
         }
       }
 
@@ -412,10 +429,18 @@ class SpaceShooterGame {
           player.hasMultiShot = true;
           this.host.showGameEvent(`${side.toUpperCase()} TRIPLE BULLETS! 🚀`);
           this.host.triggerScreenFlash('rgba(0, 150, 255, 0.3)');
+          
+          // Update HUD Icon
+          const icon = document.getElementById(`p${side === 'left' ? '1' : '2'}MultiShot`);
+          if (icon) icon.classList.add('active');
         }
         if (player.multiShotTimer >= 19) {
           player.hasMultiShot = false;
           player.multiShotTimer = 0;
+          
+          // Update HUD Icon
+          const icon = document.getElementById(`p${side === 'left' ? '1' : '2'}MultiShot`);
+          if (icon) icon.classList.remove('active');
         }
       }
       
@@ -897,7 +922,7 @@ class SpaceShooterGame {
     // Draw stars
     ctx.fillStyle = '#fff';
     this.stars.forEach(star => {
-      ctx.globalAlpha = 0.5 + star.size / 4;
+      ctx.globalAlpha = (0.2 + star.size / 6) * star.parallax;
       ctx.fillRect(star.x, star.y, star.size, star.size);
     });
     ctx.globalAlpha = 1;
@@ -1017,6 +1042,8 @@ class SpaceShooterGame {
     ctx.scale(2.5, 2.5);
     
     // Rocket body
+    ctx.shadowColor = player.color;
+    ctx.shadowBlur = 15;
     ctx.fillStyle = player.color;
     ctx.beginPath();
     ctx.moveTo(20, 0);
@@ -1026,6 +1053,7 @@ class SpaceShooterGame {
     ctx.lineTo(-10, 15);
     ctx.closePath();
     ctx.fill();
+    ctx.shadowBlur = 0; // Reset shadow for other parts
     
     // Cockpit
     ctx.fillStyle = '#60a5fa';
