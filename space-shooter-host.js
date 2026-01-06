@@ -107,7 +107,7 @@ class SpaceShooterHost {
     }
     
     const playerNumber = this.players.size + 1;
-    const playerName = `Player ${playerNumber}`;
+    const playerName = data.playerName || `Player ${playerNumber}`;
     const side = playerNumber === 1 ? 'left' : 'right';
     
     this.players.set(playerId, {

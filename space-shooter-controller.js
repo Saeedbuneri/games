@@ -5,6 +5,7 @@ class SpaceShooterController {
     this.ably = null;
     this.channel = null;
     this.playerId = 'player-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    this.playerName = 'Pilot';
     this.playerSide = null;
     this.isConnected = false;
     this.gameStarted = false;
@@ -131,7 +132,8 @@ class SpaceShooterController {
         setTimeout(() => {
           console.log('Sending join request for player:', this.playerId);
           this.channel.publish('playerJoinRequest', {
-            playerId: this.playerId
+            playerId: this.playerId,
+            playerName: this.playerName
           });
         }, 1000);
       });
@@ -485,11 +487,19 @@ window.addEventListener('load', () => {
 
 async function joinRoom() {
   const code = document.getElementById('roomCodeInput').value.trim();
+  const name = document.getElementById('playerNameInput').value.trim();
+  
+  if (!name) {
+    alert('⚠️ Please enter your name');
+    return;
+  }
   
   if (!code || code.length !== 6) {
     alert('⚠️ Please enter a valid 6-character room code');
     return;
   }
+  
+  controller.playerName = name;
   
   if (!controller.roomManager.joinRoom(code)) {
     alert('⚠️ Invalid room code format');

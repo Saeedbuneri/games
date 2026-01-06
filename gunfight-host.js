@@ -127,13 +127,13 @@ class GunFightHost {
   }
   
   handlePlayerJoined(data) {
-    const { playerId } = data;
+    const { playerId, playerName } = data;
     console.log('Player joining:', playerId, data);
     
     if (!this.players.has(playerId)) {
       const player = {
         id: playerId,
-        name: `Player ${this.players.size + 1}`,
+        name: playerName || `Player ${this.players.size + 1}`,
         x: Math.random() * 1000 + 500,
         y: Math.random() * 1000 + 500,
         angle: 0,

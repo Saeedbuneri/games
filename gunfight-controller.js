@@ -5,6 +5,7 @@ class GunFightController {
     this.ably = null;
     this.channel = null;
     this.playerId = 'player-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    this.playerName = 'Soldier';
     this.playerTeam = null;
     this.isConnected = false;
     this.gameStarted = false;
@@ -59,7 +60,15 @@ class GunFightController {
     // Join button
     document.getElementById('joinBtn').addEventListener('click', () => {
       const code = document.getElementById('roomCodeInput').value.trim();
+      const name = document.getElementById('playerNameInput').value.trim();
+      
+      if (!name) {
+        alert('Please enter your name');
+        return;
+      }
+      
       if (code.length === 4) {
+        this.playerName = name;
         this.joinGame(code);
       } else {
         alert('Please enter a 4-letter room code');
@@ -106,6 +115,7 @@ class GunFightController {
           console.log('Sending player-joined for:', this.playerId);
           this.channel.publish('player-joined', {
             playerId: this.playerId,
+            playerName: this.playerName,
             timestamp: Date.now()
           });
         }, 500);
