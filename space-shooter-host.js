@@ -236,10 +236,10 @@ class SpaceShooterGame {
     
     this.players = {
       left: {
-        x: 80,
+        x: 250,
         y: this.canvas.height / 2,
-        width: 60,
-        height: 90,
+        width: 80,
+        height: 120,
         health: 100,
         score: 0,
         bullets: [],
@@ -258,10 +258,10 @@ class SpaceShooterGame {
         hasMultiShot: false
       },
       right: {
-        x: this.canvas.width - 80,
+        x: this.canvas.width - 250,
         y: this.canvas.height / 2,
-        width: 60,
-        height: 90,
+        width: 80,
+        height: 120,
         health: 100,
         score: 0,
         bullets: [],
@@ -319,11 +319,11 @@ class SpaceShooterGame {
     
     // Stars background
     this.stars = [];
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 150; i++) {
       this.stars.push({
         x: Math.random() * this.canvas.width,
         y: Math.random() * this.canvas.height,
-        size: Math.random() * 2,
+        size: Math.random() * 4,
         speed: Math.random() * 0.5 + 0.1
       });
     }
@@ -505,9 +505,9 @@ class SpaceShooterGame {
     this.healSpawnTimer += dt;
     if (this.healSpawnTimer > 8) { // Spawn every 8 seconds
       this.healingPops.push({
-        x: this.canvas.width / 2 + (Math.random() - 0.5) * 200, // Near middle
+        x: this.canvas.width / 2 + (Math.random() - 0.5) * 400, // Slightly wider range
         y: -50,
-        radius: 25,
+        radius: 40,
         targetY: this.canvas.height + 50,
         speed: 100 + Math.random() * 50,
         pulse: 0
@@ -659,7 +659,7 @@ class SpaceShooterGame {
     
     // Determine bullet properties
     const speed = direction * (player.hasPowerFire ? 1500 : 800);
-    const radius = player.hasPowerFire ? 20 : 9;
+    const radius = player.hasPowerFire ? 35 : 15;
     
     // Main shot (Center)
     player.bullets.push({
@@ -673,7 +673,7 @@ class SpaceShooterGame {
     
     // Triple Bullet power-up (if active, fire 2 extra bullets)
     if (player.hasMultiShot) {
-      const offset = player.hasPowerFire ? 35 : 25;
+      const offset = player.hasPowerFire ? 60 : 40;
       // Top Bullet
       player.bullets.push({
         x: baseX,
@@ -770,7 +770,7 @@ class SpaceShooterGame {
     this.explosions.push({
       x: x,
       y: y,
-      radius: 10,
+      radius: 25,
       life: 0.5
     });
     
@@ -780,25 +780,25 @@ class SpaceShooterGame {
       this.particles.push({
         x: x,
         y: y,
-        vx: Math.cos(angle) * 200,
-        vy: Math.sin(angle) * 200,
+        vx: Math.cos(angle) * 300,
+        vy: Math.sin(angle) * 300,
         life: 0.8,
         color: '#fbbf24',
-        size: Math.random() * 4 + 2
+        size: Math.random() * 6 + 3
       });
     }
   }
 
   createHealParticles(x, y) {
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 20; i++) {
       this.particles.push({
         x: x,
         y: y,
-        vx: (Math.random() - 0.5) * 150,
-        vy: (Math.random() - 0.5) * 150,
-        life: 1.0,
+        vx: (Math.random() - 0.5) * 250,
+        vy: (Math.random() - 0.5) * 250,
+        life: 1.2,
         color: '#4ade80',
-        size: Math.random() * 5 + 3
+        size: Math.random() * 8 + 4
       });
     }
   }
@@ -893,13 +893,6 @@ class SpaceShooterGame {
     // Clear
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    // Center the view and zoom in
-    // Logic: Move origin to center, scale, then move back
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.scale(1.5, 1.5); 
-    ctx.translate(-canvas.width / 2, -canvas.height / 2);
     
     // Draw stars
     ctx.fillStyle = '#fff';
@@ -1002,15 +995,13 @@ class SpaceShooterGame {
       
       // Cross
       ctx.fillStyle = 'white';
-      const w = pop.radius * 0.4;
-      const h = pop.radius * 0.12;
+      const w = pop.radius * 0.6;
+      const h = pop.radius * 0.15;
       ctx.fillRect(-w/2, -h/2, w, h);
       ctx.fillRect(-h/2, -w/2, h, w);
       
       ctx.restore();
     });
-
-    ctx.restore(); // End zoom transform
   }
   
   drawRocket(ctx, player, side) {
@@ -1023,7 +1014,7 @@ class SpaceShooterGame {
     }
     
     // Scale for better visibility at 100% zoom
-    ctx.scale(1.5, 1.5);
+    ctx.scale(2.5, 2.5);
     
     // Rocket body
     ctx.fillStyle = player.color;
