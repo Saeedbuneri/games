@@ -240,7 +240,7 @@ class SpaceShooterGame {
 
     this.players = {
       left: {
-        x: 450,
+        x: Math.max(120, this.canvas.width * 0.15),
         y: centerY,
         width: 100,
         height: 150,
@@ -262,7 +262,7 @@ class SpaceShooterGame {
         hasMultiShot: false
       },
       right: {
-        x: this.canvas.width - 450,
+        x: Math.min(this.canvas.width - 120, this.canvas.width * 0.85),
         y: centerY,
         width: 100,
         height: 150,
